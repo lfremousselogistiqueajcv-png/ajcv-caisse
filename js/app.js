@@ -7,7 +7,8 @@ import {
   TYPES, state, useAdapter, onChange, hydrate,
   addEntry, reversal, addRemise, setOperateur, setRole, isAdmin,
   computeTotals, getCloture, addCloture,
-  exportRows, exportFacturesRows, exportRemisesRows, exportCloturesRows, persistFond
+  exportRows, exportFacturesRows, exportRemisesRows, exportCloturesRows,
+  persistFond, lockFond, isFondLocked, uploadPhoto, photoUrl
 } from "./state.js";
 import * as prefs from "./prefs.js";
 import * as auth from "./auth.js";
@@ -25,6 +26,7 @@ let currentUid = null;
 let booted = false;
 let setpwdMode = "account";
 let ckBuilt = false;
+let pendingPhoto = null;   // { blob, dataUrl } photo de l'opération en cours de saisie
 
 function supabaseConfigured(){
   return CONFIG.USE_SUPABASE && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY &&
@@ -68,6 +70,78 @@ function renderDash(){
   $("st-nb").textContent = t.nb;
 }
 
+function renderFond(){
+  const locked = isFondLocked();
+  $("fond").readOnly = locked;
+  $("fond-lock").hidden = locked;
+  $("fond-state").hidden = !locked;
+}
+
+// ───────── photo du paiement ─────────
+function dataURLtoBlob(d){
+  const parts = d.split(","); const mime = (parts[0].match(/:(.*?);/) || [])[1] || "image/jpeg";
+  const bin = atob(parts[1]); const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+function resizePhoto(file, cb){
+  const fr = new FileReader();
+  fr.onerror = () => cb(null);
+  fr.onload = () => {
+    const raw = fr.result;
+    let ctxOk = false;
+    try { ctxOk = !!document.createElement("canvas").getContext("2d"); } catch (e) {}
+    if (!ctxOk) return cb({ blob: file, dataUrl: raw });   // pas de canvas (ex. tests) -> photo brute
+    const img = new Image();
+    let settled = false;
+    const fallback = () => { if (!settled){ settled = true; cb({ blob: file, dataUrl: raw }); } };
+    const tmo = setTimeout(fallback, 4000);
+    img.onerror = () => { clearTimeout(tmo); fallback(); };
+    img.onload = () => {
+      if (settled) return; settled = true; clearTimeout(tmo);
+      try {
+        const max = 1280; let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        if (!w || !h) return cb({ blob: file, dataUrl: raw });
+        if (w > max || h > max){ if (w >= h){ h = Math.round(h * max / w); w = max; } else { w = Math.round(w * max / h); h = max; } }
+        const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+        cv.getContext("2d").drawImage(img, 0, 0, w, h);
+        const dataUrl = cv.toDataURL("image/jpeg", 0.7);
+        if (cv.toBlob) cv.toBlob(b => cb({ blob: b || dataURLtoBlob(dataUrl), dataUrl }), "image/jpeg", 0.7);
+        else cb({ blob: dataURLtoBlob(dataUrl), dataUrl });
+      } catch (e) { cb({ blob: file, dataUrl: raw }); }
+    };
+    img.src = raw;
+  };
+  fr.readAsDataURL(file);
+}
+function clearPhoto(){
+  pendingPhoto = null;
+  $("photo-file").value = "";
+  $("photo-prev").hidden = true;
+  $("photo-add").hidden = false;
+  $("photo-thumb").removeAttribute("src");
+}
+function onPhotoPick(file){
+  if (!file) return;
+  resizePhoto(file, res => {
+    if (!res){ toast("Image illisible"); return; }
+    pendingPhoto = res;
+    $("photo-thumb").src = res.dataUrl;
+    $("photo-prev").hidden = false;
+    $("photo-add").hidden = true;
+  });
+}
+async function openPhoto(entry){
+  const view = $("ph-view");
+  view.innerHTML = '<div class="ph-load">Chargement…</div>';
+  $("photoModal").hidden = false;
+  try {
+    let url = entry.photo || "";
+    if (!url && entry.photoPath) url = await photoUrl(entry.photoPath);
+    view.innerHTML = url ? ('<img src="' + url + '" alt="photo du paiement">') : '<div class="ph-load">Photo indisponible.</div>';
+  } catch (e) { view.innerHTML = '<div class="ph-load">Photo indisponible.</div>'; }
+}
+
 function renderList(){
   const key = todayKey(), host = $("list");
   let items = state.entries.filter(e => scope === "all" || e.dateKey === key);
@@ -87,6 +161,7 @@ function renderList(){
     if (e.operateur) meta += '<span><b>Caissier</b> ' + esc(e.operateur) + "</span>";
     const typeLabel = TYPES[e.typeKey].label + (e.refSeq ? (' <span class="tk-id">de #' + p3(e.refSeq) + "</span>") : "");
     const sign = e.sens > 0 ? "+" : "−";
+    const hasPhoto = !!(e.photo || e.photoPath);
     html +=
       '<div class="ticket ' + TYPES[e.typeKey].cls + '">' +
         '<div class="tk-top"><span class="tk-id">#' + p3(e.seq) + '</span><span class="tk-lock">🔒 verrouillé</span></div>' +
@@ -94,7 +169,10 @@ function renderList(){
           '<span class="tk-amt">' + sign + " " + money(e.montant) + "</span></div>" +
         '<div class="tk-meta">' + meta + "</div>" +
         '<div class="tk-foot"><span class="tk-time">' + e.date + " · " + e.heure + "</span>" +
-          (e.typeKey === "contre" ? "" : '<button class="tk-fix" data-fix="' + e.id + '">Corriger</button>') +
+          '<span class="tk-actions">' +
+            (hasPhoto ? '<button class="tk-photo" data-photo="' + e.id + '">📷 Voir la photo</button>' : "") +
+            (e.typeKey === "contre" ? "" : '<button class="tk-fix" data-fix="' + e.id + '">Corriger</button>') +
+          "</span>" +
         "</div>" +
       "</div>";
   });
@@ -158,7 +236,7 @@ function renderCloture(){
   }
 }
 
-function renderAll(){ renderDash(); renderList(); renderCloture(); }
+function renderAll(){ renderFond(); renderDash(); renderList(); renderCloture(); }
 
 // ───────── rôle / UI ─────────
 function applyRoleUI(){
@@ -172,6 +250,7 @@ function applyRoleUI(){
 function clearForm(keepTypeMode){
   ["montant", "ndoc", "nom", "prenom", "nchq", "banque"].forEach(id => { $(id).value = ""; });
   $("err").textContent = "";
+  clearPhoto();
   if (!keepTypeMode){
     form.type = null; form.mode = null;
     document.querySelectorAll("#seg-type button,#seg-mode button").forEach(b => b.setAttribute("aria-pressed", "false"));
@@ -197,12 +276,21 @@ async function doSave(){
   const btn = $("save"), label = btn.textContent;
   btn.disabled = true; btn.textContent = "Enregistrement…";
   try {
+    let photoPath = "", photo = "";
+    if (pendingPhoto){
+      if (sb){
+        try { photoPath = await uploadPhoto(pendingPhoto.blob); }
+        catch (e) { console.error(e); toast("Photo non envoyée — opération enregistrée sans photo"); }
+      } else {
+        photo = pendingPhoto.dataUrl;
+      }
+    }
     await addEntry({
       typeKey: form.type, montant: parseAmt($("montant").value), mode: form.mode,
       ndoc: $("ndoc").value.trim(), nom: $("nom").value.trim(), prenom: $("prenom").value.trim(),
       nchq: form.mode === "Chèque" ? $("nchq").value.trim() : "",
       banque: form.mode === "Chèque" ? $("banque").value.trim() : "",
-      operateur: state.operateur
+      operateur: state.operateur, photoPath, photo
     });
     clearForm(true);
     toast("Opération enregistrée");
@@ -374,6 +462,20 @@ async function doForgot(){
   } catch (e) { $("lg-err").textContent = "Envoi impossible. Réessaie."; }
 }
 
+// ───────── fond de caisse (verrou) ─────────
+async function doFondLock(){
+  if (isFondLocked()) return;
+  const n = parseAmt($("fond").value);
+  const val = isNaN(n) ? 0 : n;
+  state.fonds[todayKey()] = val;
+  if (!window.confirm("Valider le fond de caisse à " + num2(val) + " € ?\nIl sera verrouillé pour la journée et ne pourra plus être modifié.")) return;
+  const btn = $("fond-lock"), label = btn.textContent;
+  btn.disabled = true; btn.textContent = "…";
+  try { await lockFond(); $("fond").value = num2(val); toast("Fond de caisse validé et verrouillé"); }
+  catch (e) { console.error(e); toast("Validation impossible — réessaie"); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+
 // ───────── câblage statique ─────────
 function wireUI(){
   buildDenom("cl", $("cl-denom"));
@@ -400,13 +502,16 @@ function wireUI(){
   $("oper").addEventListener("input", function(){ prefs.setOperateur(this.value); setOperateur(this.value); });
 
   $("fond").addEventListener("input", function(){
+    if (isFondLocked()) return;
     state.fonds[todayKey()] = isNaN(parseAmt(this.value)) ? 0 : parseAmt(this.value);
     renderDash(); renderCloture();
   });
   $("fond").addEventListener("blur", async function(){
+    if (isFondLocked()) return;
     const n = parseAmt(this.value); this.value = isNaN(n) ? "" : num2(n);
     try { await persistFond(); } catch (e) { toast("Fond de caisse non enregistré"); }
   });
+  $("fond-lock").addEventListener("click", doFondLock);
 
   $("scope").addEventListener("click", ev => {
     const b = ev.target.closest("button"); if (!b) return; scope = b.dataset.scope;
@@ -434,7 +539,15 @@ function wireUI(){
   $("ck-close").addEventListener("click", () => { $("checkModal").hidden = true; });
   $("ck-done").addEventListener("click", () => { $("checkModal").hidden = true; });
 
+  // photo du paiement
+  $("photo-add").addEventListener("click", () => $("photo-file").click());
+  $("photo-file").addEventListener("change", e => onPhotoPick(e.target.files && e.target.files[0]));
+  $("photo-rm").addEventListener("click", clearPhoto);
+  $("ph-close").addEventListener("click", () => { $("photoModal").hidden = true; $("ph-view").innerHTML = ""; });
+
   $("list").addEventListener("click", async ev => {
+    const ph = ev.target.closest("[data-photo]");
+    if (ph){ const e = state.entries.find(x => x.id === ph.dataset.photo); if (e) openPhoto(e); return; }
     const b = ev.target.closest("[data-fix]"); if (!b) return;
     const e = state.entries.find(x => x.id === b.dataset.fix); if (!e) return;
     if (window.confirm("Contre-passer #" + p3(e.seq) + " (" + TYPES[e.typeKey].label + " " + num2(e.montant) +

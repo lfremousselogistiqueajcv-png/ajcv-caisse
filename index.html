@@ -63,6 +63,10 @@
     <div class="field-mini">
       <label for="fond">Fond de caisse du jour</label>
       <input id="fond" inputmode="decimal" placeholder="0,00" autocomplete="off">
+      <div class="fond-foot">
+        <button type="button" id="fond-lock">Valider le fond</button>
+        <span class="fond-state" id="fond-state" hidden>🔒 validé · verrouillé</span>
+      </div>
     </div>
     <div class="field-mini">
       <label for="oper">Opérateur (caissier)</label>
@@ -103,7 +107,6 @@
         <button type="button" data-mode="Espèces" aria-pressed="false">Espèces</button>
         <button type="button" data-mode="Chèque" aria-pressed="false">Chèque</button>
         <button type="button" data-mode="CB" aria-pressed="false">CB</button>
-        <button type="button" data-mode="Virement" aria-pressed="false">Virement</button>
       </div>
 
       <div class="lbl-row">Détails</div>
@@ -119,6 +122,16 @@
       <div id="chequeBlock" class="two" style="margin-top:10px">
         <div class="inp"><label for="nchq">N° chèque</label><input id="nchq" inputmode="numeric" autocomplete="off" placeholder="N° du chèque"></div>
         <div class="inp"><label for="banque">Banque <span style="color:var(--muted)">(facultatif)</span></label><input id="banque" autocomplete="off" placeholder="Banque"></div>
+      </div>
+
+      <div class="lbl-row">Photo du paiement <span style="color:var(--muted)">(facultatif)</span></div>
+      <div class="photo-pick">
+        <input id="photo-file" type="file" accept="image/*" capture="environment" hidden>
+        <button type="button" class="photo-btn" id="photo-add">📷 Ajouter une photo</button>
+        <div class="photo-prev" id="photo-prev" hidden>
+          <img id="photo-thumb" alt="aperçu de la photo">
+          <button type="button" class="photo-rm" id="photo-rm" aria-label="Retirer la photo">✕</button>
+        </div>
       </div>
 
       <div class="err" id="err"></div>
@@ -219,6 +232,14 @@
     <div class="cl-line"><span>Théorique chèques</span><b id="ck-chq-theo">0,00 €</b></div>
     <div class="cl-ecart" id="ck-chq-ecartBox"><span>Écart chèques</span><b id="ck-chq-ecart">—</b></div>
     <button type="button" class="save" id="ck-done">Fermer</button>
+  </div>
+</div>
+
+<!-- VISIONNEUSE PHOTO -->
+<div class="modal-overlay" id="photoModal" hidden>
+  <div class="modal-card photo-modal">
+    <div class="modal-h"><h2>Photo du paiement</h2><button type="button" class="modal-x" id="ph-close" aria-label="Fermer">✕</button></div>
+    <div class="photo-view" id="ph-view"></div>
   </div>
 </div>
 

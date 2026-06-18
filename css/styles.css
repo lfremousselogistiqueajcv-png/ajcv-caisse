@@ -240,3 +240,28 @@ input[readonly]{background:var(--surface); color:var(--muted); cursor:not-allowe
   border:1px solid var(--line); border-radius:8px; padding:7px 6px; background:#fff; min-width:0}
 .dn-q:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:transparent}
 .dn-sub{font-family:var(--mono); font-size:12.5px; color:var(--muted); text-align:right; font-variant-numeric:tabular-nums}
+
+/* ===== v4 : verrou fond de caisse + photo paiement ===== */
+.fond-foot{display:flex; align-items:center; gap:10px; margin-top:7px; flex-wrap:wrap}
+#fond-lock{font:inherit; cursor:pointer; font-size:12.5px; font-weight:600; color:#fff; background:var(--ink);
+  border:none; border-radius:9px; padding:7px 12px}
+#fond-lock:hover{filter:brightness(1.08)}
+.fond-state{font-size:12px; font-weight:600; color:var(--in); display:inline-flex; align-items:center; gap:5px}
+
+.photo-pick{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:2px}
+.photo-btn{font:inherit; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--ink);
+  background:var(--accent-soft); border:1px dashed var(--line); border-radius:11px; padding:10px 14px}
+.photo-btn:hover{filter:brightness(.97)}
+.photo-prev{position:relative; width:74px; height:74px; border-radius:10px; overflow:hidden; border:1px solid var(--line)}
+.photo-prev img{width:100%; height:100%; object-fit:cover; display:block}
+.photo-rm{position:absolute; top:3px; right:3px; width:22px; height:22px; border:none; border-radius:50%;
+  background:rgba(21,35,63,.78); color:#fff; font-size:12px; cursor:pointer; line-height:1; padding:0}
+
+.tk-actions{display:inline-flex; align-items:center; gap:14px}
+.tk-photo{font:inherit; cursor:pointer; font-size:12px; font-weight:600; color:var(--ink-soft); background:none; border:none; padding:2px 0}
+.tk-photo:hover{text-decoration:underline; color:var(--ink)}
+
+.photo-modal{max-width:560px}
+.photo-view{margin-top:8px; min-height:120px; display:flex; align-items:center; justify-content:center}
+.photo-view img{max-width:100%; max-height:72vh; border-radius:10px; display:block}
+.ph-load{color:var(--muted); font-size:13px; padding:24px}

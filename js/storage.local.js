@@ -9,7 +9,7 @@
 const KEY = "ajcv_caisse_v3";
 
 export function createLocalStore(){
-  let data = { entries: [], fonds: {}, clotures: {}, counter: 0 };
+  let data = { entries: [], fonds: {}, fondsLocked: {}, clotures: {}, counter: 0 };
   let mem = false;
 
   try {
@@ -18,6 +18,7 @@ export function createLocalStore(){
       const d = JSON.parse(raw);
       data.entries = d.entries || [];
       data.fonds = d.fonds || {};
+      data.fondsLocked = d.fondsLocked || {};
       data.clotures = d.clotures || {};
       data.counter = d.counter || data.entries.reduce((m, e) => Math.max(m, e.seq || 0), 0);
     }
@@ -34,7 +35,11 @@ export function createLocalStore(){
     isMemory(){ return mem; },
 
     async list(){
-      return { entries: data.entries.slice(), fonds: Object.assign({}, data.fonds) };
+      return {
+        entries: data.entries.slice(),
+        fonds: Object.assign({}, data.fonds),
+        fondsLocked: Object.assign({}, data.fondsLocked)
+      };
     },
 
     async create(entry){
@@ -46,10 +51,15 @@ export function createLocalStore(){
       return entry;
     },
 
-    async setFond(dateKey, val){
+    async setFond(dateKey, val, lock){
       data.fonds[dateKey] = val;
+      if (lock) data.fondsLocked[dateKey] = true;
       persist();
     },
+
+    // photo en mode local : on renvoie la donnée telle quelle (data URL stockée sur l'entrée)
+    async uploadPhoto(dataUrl){ return dataUrl; },
+    async photoUrl(ref){ return ref; },
 
     async listClotures(){
       return Object.assign({}, data.clotures);

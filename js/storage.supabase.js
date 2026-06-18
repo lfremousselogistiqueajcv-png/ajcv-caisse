@@ -12,7 +12,8 @@ export function createSupabaseStore(sb){
       montant: e.montant, mode: e.mode || null, n_doc: e.ndoc || null,
       nom: e.nom || null, prenom: e.prenom || null,
       n_cheque: e.nchq || null, banque: e.banque || null,
-      operateur: e.operateur || null, ref_numero: e.refSeq || null
+      operateur: e.operateur || null, ref_numero: e.refSeq || null,
+      photo_path: e.photoPath || null
     };
   }
   function fromRow(r){
@@ -22,7 +23,8 @@ export function createSupabaseStore(sb){
       typeKey: r.type, sens: r.sens, montant: Number(r.montant),
       mode: r.mode || "", ndoc: r.n_doc || "", nom: r.nom || "", prenom: r.prenom || "",
       nchq: r.n_cheque || "", banque: r.banque || "",
-      operateur: r.operateur || "", refSeq: r.ref_numero || null
+      operateur: r.operateur || "", refSeq: r.ref_numero || null,
+      photoPath: r.photo_path || ""
     };
   }
   function clFromRow(r){
@@ -46,9 +48,9 @@ export function createSupabaseStore(sb){
       if (error) throw error;
       const { data: fo, error: fe } = await sb.from("caisse_fonds").select("*");
       if (fe) throw fe;
-      const fonds = {};
-      (fo || []).forEach(f => { fonds[f.op_date] = Number(f.montant); });
-      return { entries: (ops || []).map(fromRow), fonds };
+      const fonds = {}, fondsLocked = {};
+      (fo || []).forEach(f => { fonds[f.op_date] = Number(f.montant); if (f.locked) fondsLocked[f.op_date] = true; });
+      return { entries: (ops || []).map(fromRow), fonds, fondsLocked };
     },
 
     async create(entry){
@@ -58,11 +60,29 @@ export function createSupabaseStore(sb){
       return fromRow(data);
     },
 
-    async setFond(dateKey, val){
+    async setFond(dateKey, val, lock){
+      const row = { op_date: dateKey, montant: val, locked: !!lock };
+      if (lock) row.locked_at = new Date().toISOString();
       const { error } = await sb
         .from("caisse_fonds")
-        .upsert({ op_date: dateKey, montant: val }, { onConflict: "op_date" });
+        .upsert(row, { onConflict: "op_date" });
       if (error) throw error;
+    },
+
+    // Stockage des photos (bucket privé "caisse-photos") -> renvoie le chemin
+    async uploadPhoto(blob){
+      const ext = (blob.type && blob.type.indexOf("png") > -1) ? "png" : "jpg";
+      const path = new Date().toISOString().slice(0, 10) + "/" +
+        (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + "_" + Math.random().toString(36).slice(2))) + "." + ext;
+      const { error } = await sb.storage.from("caisse-photos")
+        .upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: false });
+      if (error) throw error;
+      return path;
+    },
+    async photoUrl(path){
+      const { data, error } = await sb.storage.from("caisse-photos").createSignedUrl(path, 3600);
+      if (error) throw error;
+      return data.signedUrl;
     },
 
     async listClotures(){

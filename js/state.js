@@ -10,9 +10,9 @@ export const TYPES = {
   remise:  { label: "Remise compta",    sens: -1, cls: "remise" },
   contre:  { label: "Contre-passation", sens: 0,  cls: "contre" }
 };
-export const MODES = ["Espèces", "Chèque", "CB", "Virement"];
+export const MODES = ["Espèces", "Chèque", "CB"];
 
-export const state = { operateur: "", role: "local", fonds: {}, entries: [], clotures: {} };
+export const state = { operateur: "", role: "local", fonds: {}, fondsLocked: {}, entries: [], clotures: {} };
 
 let adapter = null;
 const listeners = [];
@@ -25,6 +25,7 @@ export async function hydrate(){
   const d = await adapter.list();
   state.entries = d.entries || [];
   state.fonds = d.fonds || {};
+  state.fondsLocked = d.fondsLocked || {};
   if (adapter.listClotures){
     state.clotures = await adapter.listClotures();
   }
@@ -42,7 +43,8 @@ export async function addEntry(pl){
     mode: pl.mode || "", ndoc: pl.ndoc || "", nom: pl.nom || "", prenom: pl.prenom || "",
     nchq: pl.nchq || "", banque: pl.banque || "",
     operateur: pl.operateur != null ? pl.operateur : state.operateur,
-    refSeq: pl.refSeq || null
+    refSeq: pl.refSeq || null,
+    photoPath: pl.photoPath || "", photo: pl.photo || ""
   };
   const saved = await adapter.create(draft);
   if (saved !== draft && !state.entries.some(e => e.id === saved.id)) state.entries.unshift(saved);
@@ -75,6 +77,10 @@ export function setOperateur(v){ state.operateur = v || ""; }
 export function setRole(r){ state.role = r || "local"; }
 export function isAdmin(){ return state.role === "admin" || state.role === "local"; }
 
+// Photos : délégué à l'adaptateur (Supabase Storage en ligne, data URL en local)
+export async function uploadPhoto(blob){ return adapter && adapter.uploadPhoto ? adapter.uploadPhoto(blob) : ""; }
+export async function photoUrl(ref){ return adapter && adapter.photoUrl ? adapter.photoUrl(ref) : ref; }
+
 // fond : maj mémoire + rendu immédiat ; persistance via persistFond()
 export function setFondLocal(v, key){
   key = key || todayKey();
@@ -83,7 +89,14 @@ export function setFondLocal(v, key){
 }
 export async function persistFond(key){
   key = key || todayKey();
-  if (adapter) await adapter.setFond(key, state.fonds[key] || 0);
+  if (adapter) await adapter.setFond(key, state.fonds[key] || 0, false);
+}
+export function isFondLocked(key){ key = key || todayKey(); return !!state.fondsLocked[key]; }
+export async function lockFond(key){
+  key = key || todayKey();
+  if (adapter) await adapter.setFond(key, state.fonds[key] || 0, true);
+  state.fondsLocked[key] = true;
+  emit();
 }
 
 export function computeTotals(key){

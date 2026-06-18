@@ -60,7 +60,8 @@ create table if not exists public.caisse_operations (
   n_cheque    text,
   banque      text,
   operateur   text,
-  ref_numero  bigint
+  ref_numero  bigint,
+  photo_path  text
 );
 create index if not exists idx_caisse_ops_date on public.caisse_operations (op_date);
 
@@ -71,6 +72,9 @@ create table if not exists public.caisse_fonds (
   op_date    date primary key,
   montant    numeric(12,2) not null default 0,
   operateur  text,
+  locked     boolean not null default false,
+  locked_at  timestamptz,
+  locked_by  uuid,
   updated_at timestamptz not null default now()
 );
 
@@ -124,8 +128,9 @@ create policy fonds_select on public.caisse_fonds
   for select to authenticated using (true);
 create policy fonds_insert on public.caisse_fonds
   for insert to authenticated with check (true);
+-- Une fois le fond validé (locked = true), plus aucune modification possible
 create policy fonds_update on public.caisse_fonds
-  for update to authenticated using (true) with check (true);
+  for update to authenticated using (locked = false) with check (true);
 
 -- Clôtures : lecture + ajout (append-only)
 drop policy if exists clotures_select on public.caisse_clotures;
@@ -134,6 +139,21 @@ create policy clotures_select on public.caisse_clotures
   for select to authenticated using (true);
 create policy clotures_insert on public.caisse_clotures
   for insert to authenticated with check (true);
+
+-- ─────────────────────────────────────────────────────────────
+-- Stockage des photos de paiement (bucket privé "caisse-photos")
+-- Lecture + ajout réservés aux connectés ; pas de modif/suppression.
+-- ─────────────────────────────────────────────────────────────
+insert into storage.buckets (id, name, public)
+values ('caisse-photos', 'caisse-photos', false)
+on conflict (id) do nothing;
+
+drop policy if exists caisse_photos_read on storage.objects;
+drop policy if exists caisse_photos_insert on storage.objects;
+create policy caisse_photos_read on storage.objects
+  for select to authenticated using (bucket_id = 'caisse-photos');
+create policy caisse_photos_insert on storage.objects
+  for insert to authenticated with check (bucket_id = 'caisse-photos');
 
 -- ─────────────────────────────────────────────────────────────
 -- Rappel sécurité
