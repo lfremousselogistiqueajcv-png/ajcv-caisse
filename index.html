@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="AJCV — saisie de caisse : espèces, chèques, règlements. Journal verrouillé.">
+<meta name="theme-color" content="#15233F">
+<title>AJCV · Caisse</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ÉCRAN DE CONNEXION (mode Supabase) -->
+<div class="login-overlay" id="login" hidden>
+  <div class="login-card">
+    <div class="brand"><span class="dot"></span><div>AJCV<small>Caisse</small></div></div>
+    <h1>Connexion</h1>
+    <div class="inp"><label for="lg-email">E-mail</label><input id="lg-email" type="email" autocomplete="username" placeholder="prenom@ajcv.re"></div>
+    <div class="inp"><label for="lg-pwd">Mot de passe</label><input id="lg-pwd" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+    <div class="err" id="lg-err"></div>
+    <button class="save" id="lg-btn">Se connecter</button>
+  </div>
+</div>
+
+<div class="wrap" id="appwrap">
+
+  <header class="appbar">
+    <div class="brand"><span class="dot"></span><div>AJCV<small>Caisse · saisie</small></div></div>
+    <div class="appbar-right">
+      <div class="clock"><b id="ck-time">--:--</b><span id="ck-date">—</span></div>
+      <div class="userbox" id="userbox" hidden>
+        <span class="who"><b id="ub-name">—</b><span id="ub-role" class="role">—</span></span>
+        <button class="signout" id="signout">Déconnexion</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="banner" id="banner"></div>
+
+  <section class="dash">
+    <div class="solde">
+      <span class="lbl">Solde caisse espèces · aujourd'hui</span>
+      <span class="val" id="solde">0,00 €</span>
+    </div>
+    <div class="field-mini">
+      <label for="fond">Fond de caisse du jour</label>
+      <input id="fond" inputmode="decimal" placeholder="0,00" autocomplete="off">
+    </div>
+    <div class="field-mini">
+      <label for="oper">Opérateur (caissier)</label>
+      <input id="oper" placeholder="Nom du caissier" autocomplete="off">
+    </div>
+    <div class="stats">
+      <div class="stat in"><div class="n" id="st-in">0,00 €</div><div class="t">Encaissé (jour)</div></div>
+      <div class="stat out"><div class="n" id="st-out">0,00 €</div><div class="t">Sorties (jour)</div></div>
+      <div class="stat"><div class="n" id="st-nb">0</div><div class="t">Opérations</div></div>
+    </div>
+  </section>
+
+  <div class="grid">
+
+    <!-- SAISIE -->
+    <section class="card">
+      <div class="card-h"><h2>Nouvelle opération</h2><span class="hint">Date et heure automatiques</span></div>
+
+      <div class="lbl-row">Type de document</div>
+      <div class="seg" id="seg-type">
+        <button type="button" class="facture" data-type="facture" aria-pressed="false"><span class="ico">+</span>Facture</button>
+        <button type="button" class="sortie"  data-type="sortie"  aria-pressed="false"><span class="ico">−</span>Sortie de caisse</button>
+        <button type="button" class="retour"  data-type="retour"  aria-pressed="false"><span class="ico">↩</span>Retour d'argent</button>
+      </div>
+
+      <div class="lbl-row">Montant</div>
+      <div class="amount">
+        <input id="montant" inputmode="decimal" placeholder="0,00" autocomplete="off" aria-label="Montant en euros">
+        <span class="cur">€</span>
+      </div>
+
+      <div class="lbl-row">Mode de règlement</div>
+      <div class="chips" id="seg-mode">
+        <button type="button" data-mode="Espèces" aria-pressed="false">Espèces</button>
+        <button type="button" data-mode="Chèque" aria-pressed="false">Chèque</button>
+        <button type="button" data-mode="CB" aria-pressed="false">CB</button>
+        <button type="button" data-mode="Virement" aria-pressed="false">Virement</button>
+      </div>
+
+      <div class="lbl-row">Détails</div>
+      <div class="two">
+        <div class="inp"><label for="ndoc">N° document</label><input id="ndoc" autocomplete="off" placeholder="ex. FA-1042"></div>
+        <div class="inp"><label for="nom">Nom</label><input id="nom" autocomplete="off" placeholder="Nom"></div>
+      </div>
+      <div class="two" style="margin-top:10px">
+        <div class="inp"><label for="prenom">Prénom <span style="color:var(--muted)">(facultatif)</span></label><input id="prenom" autocomplete="off" placeholder="Prénom"></div>
+        <div class="inp"></div>
+      </div>
+
+      <div id="chequeBlock" class="two" style="margin-top:10px">
+        <div class="inp"><label for="nchq">N° chèque</label><input id="nchq" inputmode="numeric" autocomplete="off" placeholder="N° du chèque"></div>
+        <div class="inp"><label for="banque">Banque <span style="color:var(--muted)">(facultatif)</span></label><input id="banque" autocomplete="off" placeholder="Banque"></div>
+      </div>
+
+      <div class="err" id="err"></div>
+      <button class="save" id="save">Enregistrer l'opération</button>
+      <div class="captured">Sera horodaté : <b id="cap">—</b></div>
+    </section>
+
+    <!-- JOURNAL -->
+    <aside class="card">
+      <div class="card-h">
+        <h2>Journal</h2>
+        <div class="toggle" id="scope" hidden>
+          <button type="button" data-scope="day" aria-pressed="true">Aujourd'hui</button>
+          <button type="button" data-scope="all" aria-pressed="false">Tout</button>
+        </div>
+      </div>
+      <div class="filters" id="filters" hidden>
+        <button type="button" data-filter="all" aria-pressed="true">Tout</button>
+        <button type="button" data-filter="facture" aria-pressed="false">Factures</button>
+        <button type="button" data-filter="sortie" aria-pressed="false">Sorties</button>
+        <button type="button" data-filter="retour" aria-pressed="false">Retours</button>
+      </div>
+      <div class="tools">
+        <button type="button" id="exp-xlsx">Exporter .xlsx</button>
+        <button type="button" id="exp-copy">Copier pour Excel</button>
+      </div>
+      <div class="hint" style="margin:2px 0 4px">Lignes verrouillées : pour corriger une erreur, utilise « Corriger » (contre-passation).</div>
+      <div class="list" id="list"></div>
+    </aside>
+
+  </div>
+
+  <!-- CLÔTURE DU JOUR -->
+  <section class="card cloture" id="clotureCard">
+    <div class="card-h"><h2>Clôture du jour</h2><span class="hint" id="cl-date">—</span></div>
+    <div id="cl-form">
+      <div class="cl-grid">
+        <div class="cl-line"><span>Fond de caisse</span><b id="cl-fond">0,00 €</b></div>
+        <div class="cl-line"><span>Encaissements espèces</span><b id="cl-in">0,00 €</b></div>
+        <div class="cl-line"><span>Sorties espèces</span><b id="cl-out">0,00 €</b></div>
+        <div class="cl-line theo"><span>Théorique en caisse</span><b id="cl-theo">0,00 €</b></div>
+      </div>
+      <div class="cl-count">
+        <div class="inp"><label for="cl-reel">Comptage réel (espèces)</label><input id="cl-reel" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
+        <div class="cl-ecart"><span>Écart</span><b id="cl-ecart">—</b></div>
+      </div>
+      <button class="save cl-btn" id="cl-save">Clôturer la journée</button>
+    </div>
+    <div id="cl-done" class="cl-done" hidden></div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
