@@ -50,7 +50,7 @@ create table if not exists public.caisse_operations (
   user_id     uuid not null default auth.uid(),      -- auteur réel (audit)
   op_date     date  not null,
   op_time     text  not null,
-  type        text  not null check (type in ('facture','sortie','retour','contre')),
+  type        text  not null check (type in ('facture','sortie','retour','remise','contre')),
   sens        smallint not null check (sens in (-1, 1)),
   montant     numeric(12,2) not null check (montant >= 0),
   mode        text,
@@ -78,14 +78,18 @@ create table if not exists public.caisse_fonds (
 -- Clôtures de caisse quotidiennes (une par jour, append-only)
 -- ─────────────────────────────────────────────────────────────
 create table if not exists public.caisse_clotures (
-  op_date     date primary key,
-  created_at  timestamptz not null default now(),
-  user_id     uuid not null default auth.uid(),
-  fond        numeric(12,2) not null default 0,
-  theorique   numeric(12,2) not null default 0,
-  comptage    numeric(12,2) not null default 0,
-  ecart       numeric(12,2) not null default 0,
-  operateur   text
+  op_date          date primary key,
+  created_at       timestamptz not null default now(),
+  user_id          uuid not null default auth.uid(),
+  fond             numeric(12,2) not null default 0,
+  theorique        numeric(12,2) not null default 0,
+  comptage         numeric(12,2) not null default 0,
+  ecart            numeric(12,2) not null default 0,
+  theorique_cheque numeric(12,2) not null default 0,
+  comptage_cheque  numeric(12,2) not null default 0,
+  nb_cheque        integer not null default 0,
+  ecart_cheque     numeric(12,2) not null default 0,
+  operateur        text
 );
 
 -- ─────────────────────────────────────────────────────────────

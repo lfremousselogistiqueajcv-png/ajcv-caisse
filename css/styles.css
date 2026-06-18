@@ -195,3 +195,48 @@ input[readonly]{background:var(--surface); color:var(--muted); cursor:not-allowe
 .cl-done .row b{font-family:var(--mono); font-variant-numeric:tabular-nums}
 .cl-done.ko{border-color:var(--ret); background:var(--ret-soft)}
 .cl-done.ko h3{color:var(--ret)}
+
+/* ===== v3 : remise, comptage, reset mot de passe ===== */
+.ticket.remise{border-left-color:#5B62B5}
+.ticket.remise .tk-type{color:#5B62B5}
+.ticket.remise .tk-amt{color:#5B62B5}
+
+.linklike{display:block; width:100%; margin-top:10px; background:none; border:none; cursor:pointer;
+  font:inherit; font-size:13px; font-weight:600; color:var(--accent); text-align:center; padding:6px}
+.linklike:hover{text-decoration:underline}
+.ok-msg{color:var(--in); font-size:12.5px; margin:6px 0 0; min-height:0}
+.ok-msg:empty{display:none}
+
+/* boutons d'action du tableau de bord */
+.dash-actions{grid-column:1 / -1; display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;
+  padding-top:12px; border-top:1px dashed var(--line)}
+.dash-actions button{flex:1; min-width:150px; font:inherit; cursor:pointer; font-size:14px; font-weight:600;
+  color:#fff; background:var(--ink); border:none; border-radius:11px; padding:11px 14px; transition:filter .15s}
+.dash-actions button:hover{filter:brightness(1.08)}
+#btn-check{color:var(--ink); background:var(--accent-soft)}
+
+/* modales */
+.modal-overlay{position:fixed; inset:0; background:rgba(21,35,63,.45); display:flex; align-items:flex-start;
+  justify-content:center; padding:24px 14px; overflow:auto; z-index:70}
+.modal-overlay[hidden]{display:none}
+.modal-card{background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);
+  padding:20px; width:100%; max-width:460px; margin:auto; animation:rise .3s ease both}
+.modal-h{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px}
+.modal-h h2{font-size:17px; margin:0}
+.modal-x{font:inherit; cursor:pointer; border:none; background:none; font-size:18px; color:var(--muted); padding:2px 6px; line-height:1}
+.modal-x:hover{color:var(--ink)}
+.modal-card .inp label{display:block; font-size:12px; color:var(--muted); margin-bottom:5px}
+.modal-card .inp input{width:100%; font-family:var(--mono); font-size:16px; color:var(--ink);
+  border:1.5px solid var(--line); border-radius:10px; padding:10px 12px; background:#fff}
+.modal-card .inp input:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:transparent}
+.modal-card .save{margin-top:14px}
+
+/* grille pièces & billets */
+.denom{display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; margin:4px 0 6px}
+@media(max-width:520px){ .denom{grid-template-columns:1fr} }
+.denom-row{display:grid; grid-template-columns:54px 1fr 72px; align-items:center; gap:8px}
+.dn-lbl{font-family:var(--mono); font-size:13px; color:var(--ink-soft); text-align:right}
+.dn-q{font-family:var(--mono); font-size:15px; text-align:center; color:var(--ink);
+  border:1px solid var(--line); border-radius:8px; padding:7px 6px; background:#fff; min-width:0}
+.dn-q:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:transparent}
+.dn-sub{font-family:var(--mono); font-size:12.5px; color:var(--muted); text-align:right; font-variant-numeric:tabular-nums}

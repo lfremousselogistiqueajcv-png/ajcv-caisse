@@ -7,6 +7,7 @@ export const TYPES = {
   facture: { label: "Facture",          sens: 1,  cls: "facture" },
   sortie:  { label: "Sortie de caisse", sens: -1, cls: "sortie" },
   retour:  { label: "Retour d'argent",  sens: -1, cls: "retour" },
+  remise:  { label: "Remise compta",    sens: -1, cls: "remise" },
   contre:  { label: "Contre-passation", sens: 0,  cls: "contre" }
 };
 export const MODES = ["Espèces", "Chèque", "CB", "Virement"];
@@ -60,6 +61,16 @@ export async function reversal(id){
   });
 }
 
+// Remise à la comptabilité : décrémente la caisse (espèces) et le portefeuille chèques.
+// Crée une opération par mode concerné (espèces et/ou chèque), type "remise".
+export async function addRemise(especes, cheques){
+  const created = [];
+  const e = +especes || 0, c = +cheques || 0;
+  if (e > 0) created.push(await addEntry({ typeKey: "remise", mode: "Espèces", montant: e, nom: "Comptabilité" }));
+  if (c > 0) created.push(await addEntry({ typeKey: "remise", mode: "Chèque",  montant: c, nom: "Comptabilité" }));
+  return created;
+}
+
 export function setOperateur(v){ state.operateur = v || ""; }
 export function setRole(r){ state.role = r || "local"; }
 export function isAdmin(){ return state.role === "admin" || state.role === "local"; }
@@ -78,29 +89,40 @@ export async function persistFond(key){
 export function computeTotals(key){
   key = key || todayKey();
   const fond = state.fonds[key] || 0;
-  let esp = 0, espIn = 0, espOut = 0, inn = 0, out = 0, nb = 0;
+  let esp = 0, espIn = 0, espOut = 0, chq = 0, chqIn = 0, chqOut = 0, inn = 0, out = 0, nb = 0;
   state.entries.forEach(e => {
     if (e.dateKey !== key) return;
     nb++;
     const signed = e.sens * e.montant;
     if (e.mode === "Espèces"){ esp += signed; if (signed > 0) espIn += signed; else espOut += -signed; }
+    if (e.mode === "Chèque"){  chq += signed; if (signed > 0) chqIn += signed; else chqOut += -signed; }
     if (signed > 0) inn += signed; else out += -signed;
   });
-  // total espèces théorique en caisse = fond + encaissements espèces - sorties espèces
-  return { fond, espece: esp, espIn, espOut, soldeEspeces: fond + esp, encaisse: inn, sorties: out, nb };
+  return {
+    fond,
+    espece: esp, espIn, espOut, soldeEspeces: fond + esp,   // théorique espèces en caisse
+    cheque: chq, chqIn, chqOut, soldeCheques: chq,           // théorique chèques en caisse (net)
+    encaisse: inn, sorties: out, nb
+  };
 }
 
 // ---------- clôture quotidienne ----------
 export function getCloture(key){ key = key || todayKey(); return state.clotures[key] || null; }
 
-export async function addCloture(comptage, key){
+// pl = { comptageEspeces, comptageCheques, nbCheques }
+export async function addCloture(pl, key){
   key = key || todayKey();
   const t = computeTotals(key);
   const now = new Date();
+  const compEsp = +pl.comptageEspeces || 0;
+  const compChq = +pl.comptageCheques || 0;
+  const nbChq = parseInt(pl.nbCheques, 10) || 0;
   const c = {
     dateKey: key, date: frDate(new Date(key + "T00:00:00")),
-    fond: t.fond, theorique: t.soldeEspeces,
-    comptage: +comptage, ecart: (+comptage) - t.soldeEspeces,
+    fond: t.fond,
+    theorique: t.soldeEspeces, comptage: compEsp, ecart: compEsp - t.soldeEspeces,
+    theoriqueCheque: t.soldeCheques, comptageCheque: compChq, nbCheque: nbChq,
+    ecartCheque: compChq - t.soldeCheques,
     operateur: state.operateur, closedAt: now.toISOString()
   };
   const saved = await adapter.createCloture(c);
@@ -143,15 +165,31 @@ export function exportFacturesRows(scope){  // uniquement les encaissements de t
   return rows;
 }
 
+export function exportRemisesRows(scope){   // remises à la comptabilité
+  const key = todayKey();
+  const rows = [["Date", "Heure", "Mode", "Montant", "Opérateur"]];
+  state.entries.slice().reverse().forEach(e => {
+    if (e.typeKey !== "remise") return;
+    if (scope === "day" && e.dateKey !== key) return;
+    rows.push([e.date, e.heure, e.mode, num2(e.montant), e.operateur]);
+  });
+  return rows;
+}
+
 export function exportCloturesRows(scope){
   const key = todayKey();
-  const rows = [["Date", "Fond de caisse", "Théorique espèces", "Comptage réel", "Écart", "Opérateur", "Clôturé le"]];
+  const rows = [[
+    "Date", "Fond", "Théorique espèces", "Comptage espèces", "Écart espèces",
+    "Théorique chèques", "Comptage chèques", "Nb chèques", "Écart chèques",
+    "Opérateur", "Clôturé le"
+  ]];
   Object.keys(state.clotures).sort().forEach(k => {
     if (scope === "day" && k !== key) return;
     const c = state.clotures[k];
     const dt = c.closedAt ? new Date(c.closedAt) : null;
     rows.push([
       c.date, num2(c.fond), num2(c.theorique), num2(c.comptage), num2(c.ecart),
+      num2(c.theoriqueCheque || 0), num2(c.comptageCheque || 0), c.nbCheque || 0, num2(c.ecartCheque || 0),
       c.operateur || "", dt ? (frDate(dt) + " " + frTime(dt)) : ""
     ]);
   });

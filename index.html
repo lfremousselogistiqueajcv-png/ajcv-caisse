@@ -19,7 +19,23 @@
     <div class="inp"><label for="lg-email">E-mail</label><input id="lg-email" type="email" autocomplete="username" placeholder="prenom@ajcv.re"></div>
     <div class="inp"><label for="lg-pwd">Mot de passe</label><input id="lg-pwd" type="password" autocomplete="current-password" placeholder="••••••••"></div>
     <div class="err" id="lg-err"></div>
+    <div class="ok-msg" id="lg-info"></div>
     <button class="save" id="lg-btn">Se connecter</button>
+    <button type="button" class="linklike" id="lg-forgot">Mot de passe oublié ?</button>
+  </div>
+</div>
+
+<!-- DÉFINIR / CHANGER LE MOT DE PASSE (récupération + paramètres compte) -->
+<div class="login-overlay" id="setpwd" hidden>
+  <div class="login-card">
+    <div class="brand"><span class="dot"></span><div>AJCV<small>Caisse</small></div></div>
+    <h1 id="sp-title">Nouveau mot de passe</h1>
+    <div class="inp"><label for="sp-pwd">Nouveau mot de passe</label><input id="sp-pwd" type="password" autocomplete="new-password" placeholder="••••••••"></div>
+    <div class="inp"><label for="sp-pwd2">Confirmer</label><input id="sp-pwd2" type="password" autocomplete="new-password" placeholder="••••••••"></div>
+    <div class="err" id="sp-err"></div>
+    <div class="ok-msg" id="sp-info"></div>
+    <button class="save" id="sp-btn">Enregistrer le mot de passe</button>
+    <button type="button" class="linklike" id="sp-cancel" hidden>Annuler</button>
   </div>
 </div>
 
@@ -31,6 +47,7 @@
       <div class="clock"><b id="ck-time">--:--</b><span id="ck-date">—</span></div>
       <div class="userbox" id="userbox" hidden>
         <span class="who"><b id="ub-name">—</b><span id="ub-role" class="role">—</span></span>
+        <button class="signout" id="account">Mot de passe</button>
         <button class="signout" id="signout">Déconnexion</button>
       </div>
     </div>
@@ -55,6 +72,10 @@
       <div class="stat in"><div class="n" id="st-in">0,00 €</div><div class="t">Encaissé (jour)</div></div>
       <div class="stat out"><div class="n" id="st-out">0,00 €</div><div class="t">Sorties (jour)</div></div>
       <div class="stat"><div class="n" id="st-nb">0</div><div class="t">Opérations</div></div>
+    </div>
+    <div class="dash-actions">
+      <button type="button" id="btn-remise">Remise compta</button>
+      <button type="button" id="btn-check">Vérifier la caisse</button>
     </div>
   </section>
 
@@ -118,6 +139,7 @@
         <button type="button" data-filter="all" aria-pressed="true">Tout</button>
         <button type="button" data-filter="facture" aria-pressed="false">Factures</button>
         <button type="button" data-filter="sortie" aria-pressed="false">Sorties</button>
+        <button type="button" data-filter="remise" aria-pressed="false">Remises</button>
         <button type="button" data-filter="retour" aria-pressed="false">Retours</button>
       </div>
       <div class="tools">
@@ -138,17 +160,66 @@
         <div class="cl-line"><span>Fond de caisse</span><b id="cl-fond">0,00 €</b></div>
         <div class="cl-line"><span>Encaissements espèces</span><b id="cl-in">0,00 €</b></div>
         <div class="cl-line"><span>Sorties espèces</span><b id="cl-out">0,00 €</b></div>
-        <div class="cl-line theo"><span>Théorique en caisse</span><b id="cl-theo">0,00 €</b></div>
+        <div class="cl-line theo"><span>Théorique espèces</span><b id="cl-theo">0,00 €</b></div>
+        <div class="cl-line"><span>Théorique chèques</span><b id="cl-theo-chq">0,00 €</b></div>
       </div>
+
+      <div class="lbl-row">Comptage espèces — pièces &amp; billets</div>
+      <div class="denom" id="cl-denom"></div>
       <div class="cl-count">
-        <div class="inp"><label for="cl-reel">Comptage réel (espèces)</label><input id="cl-reel" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
-        <div class="cl-ecart"><span>Écart</span><b id="cl-ecart">—</b></div>
+        <div class="inp"><label for="cl-reel">Total espèces compté</label><input id="cl-reel" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
+        <div class="cl-ecart" id="cl-ecartBox"><span>Écart espèces</span><b id="cl-ecart">—</b></div>
       </div>
+
+      <div class="lbl-row" style="margin-top:14px">Comptage chèques</div>
+      <div class="cl-count">
+        <div class="inp"><label for="cl-chq-nb">Nombre</label><input id="cl-chq-nb" inputmode="numeric" placeholder="0" autocomplete="off"></div>
+        <div class="inp"><label for="cl-chq-total">Total chèques</label><input id="cl-chq-total" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
+        <div class="cl-ecart" id="cl-ecartBox-chq"><span>Écart chèques</span><b id="cl-ecart-chq">—</b></div>
+      </div>
+
       <button class="save cl-btn" id="cl-save">Clôturer la journée</button>
     </div>
     <div id="cl-done" class="cl-done" hidden></div>
   </section>
 
+</div>
+
+<!-- MODALE REMISE COMPTA -->
+<div class="modal-overlay" id="remiseModal" hidden>
+  <div class="modal-card">
+    <div class="modal-h"><h2>Remise compta</h2><button type="button" class="modal-x" id="rm-close" aria-label="Fermer">✕</button></div>
+    <p class="hint">Ce que tu remets à la comptabilité. La caisse est décrémentée d'autant.</p>
+    <div class="cl-line"><span>En caisse — espèces</span><b id="rm-th-esp">0,00 €</b></div>
+    <div class="cl-line"><span>En caisse — chèques</span><b id="rm-th-chq">0,00 €</b></div>
+    <div class="two" style="margin-top:12px">
+      <div class="inp"><label for="rm-esp">Espèces remises</label><input id="rm-esp" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
+      <div class="inp"><label for="rm-chq">Chèques remis (total)</label><input id="rm-chq" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
+    </div>
+    <div class="err" id="rm-err"></div>
+    <button class="save" id="rm-save">Valider la remise</button>
+  </div>
+</div>
+
+<!-- MODALE VÉRIFIER LA CAISSE (comptage à blanc) -->
+<div class="modal-overlay" id="checkModal" hidden>
+  <div class="modal-card">
+    <div class="modal-h"><h2>Vérifier la caisse</h2><button type="button" class="modal-x" id="ck-close" aria-label="Fermer">✕</button></div>
+    <p class="hint">Comptage à blanc — rien n'est enregistré.</p>
+    <div class="lbl-row">Espèces — pièces &amp; billets</div>
+    <div class="denom" id="ck-denom"></div>
+    <div class="cl-line theo"><span>Total compté espèces</span><b id="ck-cash-total">0,00 €</b></div>
+    <div class="cl-line"><span>Théorique espèces</span><b id="ck-cash-theo">0,00 €</b></div>
+    <div class="cl-ecart" id="ck-cash-ecartBox"><span>Écart espèces</span><b id="ck-cash-ecart">—</b></div>
+    <div class="lbl-row" style="margin-top:14px">Chèques</div>
+    <div class="two">
+      <div class="inp"><label for="ck-chq-nb">Nombre</label><input id="ck-chq-nb" inputmode="numeric" placeholder="0" autocomplete="off"></div>
+      <div class="inp"><label for="ck-chq-total">Total chèques</label><input id="ck-chq-total" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
+    </div>
+    <div class="cl-line"><span>Théorique chèques</span><b id="ck-chq-theo">0,00 €</b></div>
+    <div class="cl-ecart" id="ck-chq-ecartBox"><span>Écart chèques</span><b id="ck-chq-ecart">—</b></div>
+    <button type="button" class="save" id="ck-done">Fermer</button>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>

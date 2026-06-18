@@ -16,7 +16,19 @@ export async function signOut(sb){
 }
 
 export function onAuthChange(sb, cb){
-  sb.auth.onAuthStateChange((_event, session) => cb(session));
+  sb.auth.onAuthStateChange((event, session) => cb(event, session));
+}
+
+// Envoi d'un e-mail de réinitialisation (lien de récupération)
+export async function resetPassword(sb, email, redirectTo){
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+  return { error };
+}
+
+// Définit un nouveau mot de passe pour l'utilisateur connecté (ou en récupération)
+export async function updatePassword(sb, newPassword){
+  const { error } = await sb.auth.updateUser({ password: newPassword });
+  return { error };
 }
 
 // Profil = rôle + nom affiché (table public.profiles)

@@ -5,15 +5,16 @@ import { CONFIG } from "./config.js";
 import { money, num2, parseAmt, esc, frDate, frTime, todayKey } from "./format.js";
 import {
   TYPES, state, useAdapter, onChange, hydrate,
-  addEntry, reversal, setOperateur, setRole, isAdmin,
+  addEntry, reversal, addRemise, setOperateur, setRole, isAdmin,
   computeTotals, getCloture, addCloture,
-  exportRows, exportFacturesRows, exportCloturesRows, persistFond
+  exportRows, exportFacturesRows, exportRemisesRows, exportCloturesRows, persistFond
 } from "./state.js";
 import * as prefs from "./prefs.js";
 import * as auth from "./auth.js";
 import { createLocalStore } from "./storage.local.js";
 
-const TYPE_COLOR = { facture: "#0E8A5F", sortie: "#C9760A", retour: "#C2334D", contre: "#15233F" };
+const TYPE_COLOR = { facture: "#0E8A5F", sortie: "#C9760A", retour: "#C2334D", remise: "#5B62B5", contre: "#15233F" };
+const DENOMS = [50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1]; // centimes
 const $ = id => document.getElementById(id);
 
 const form = { type: null, mode: null };
@@ -22,12 +23,38 @@ let typeFilter = "all";
 let sb = null;
 let currentUid = null;
 let booted = false;
+let setpwdMode = "account";
+let ckBuilt = false;
 
 function supabaseConfigured(){
   return CONFIG.USE_SUPABASE && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY &&
          CONFIG.SUPABASE_URL.indexOf("YOUR-") === -1;
 }
 function p3(n){ n = "" + n; while (n.length < 3) n = "0" + n; return n; }
+function signMoney(ec){ return (ec > 0 ? "+ " : "") + money(ec); }
+
+// ───────── comptage pièces/billets ─────────
+function denomLabel(c){ return c >= 100 ? (c / 100) + " €" : c + " c"; }
+function buildDenom(prefix, host){
+  host.innerHTML = DENOMS.map(c =>
+    '<div class="denom-row"><span class="dn-lbl">' + denomLabel(c) + "</span>" +
+    '<input class="dn-q" inputmode="numeric" placeholder="0" id="' + prefix + "-d-" + c + '">' +
+    '<span class="dn-sub" id="' + prefix + "-s-" + c + '">0,00</span></div>'
+  ).join("");
+}
+function sumDenom(prefix){
+  let cents = 0;
+  DENOMS.forEach(c => {
+    const el = $(prefix + "-d-" + c);
+    const q = parseInt(el && el.value, 10) || 0;
+    const sub = q * c; cents += sub;
+    const s = $(prefix + "-s-" + c); if (s) s.textContent = num2(sub / 100);
+  });
+  return cents / 100;
+}
+function resetDenom(prefix){
+  DENOMS.forEach(c => { const el = $(prefix + "-d-" + c); if (el) el.value = ""; const s = $(prefix + "-s-" + c); if (s) s.textContent = "0,00"; });
+}
 
 // ───────── rendu ─────────
 function setAccent(t){ document.documentElement.style.setProperty("--accent", t ? TYPE_COLOR[t] : "#15233F"); }
@@ -77,13 +104,22 @@ function renderList(){
 function updateEcart(){
   const theo = computeTotals().soldeEspeces;
   const v = parseAmt($("cl-reel").value);
-  const cont = document.querySelector(".cl-ecart");
-  if (isNaN(v)){ $("cl-ecart").textContent = "—"; cont.classList.remove("ok", "ko"); return; }
+  const box = $("cl-ecartBox");
+  if (isNaN(v)){ $("cl-ecart").textContent = "—"; box.classList.remove("ok", "ko"); return; }
   const ec = v - theo;
-  $("cl-ecart").textContent = (ec > 0 ? "+ " : "") + money(ec);
+  $("cl-ecart").textContent = signMoney(ec);
   const nul = Math.abs(ec) < 0.005;
-  cont.classList.toggle("ok", nul);
-  cont.classList.toggle("ko", !nul);
+  box.classList.toggle("ok", nul); box.classList.toggle("ko", !nul);
+}
+function updateEcartChq(){
+  const theo = computeTotals().soldeCheques;
+  const v = parseAmt($("cl-chq-total").value);
+  const box = $("cl-ecartBox-chq");
+  if (isNaN(v)){ $("cl-ecart-chq").textContent = "—"; box.classList.remove("ok", "ko"); return; }
+  const ec = v - theo;
+  $("cl-ecart-chq").textContent = signMoney(ec);
+  const nul = Math.abs(ec) < 0.005;
+  box.classList.toggle("ok", nul); box.classList.toggle("ko", !nul);
 }
 
 function renderCloture(){
@@ -94,26 +130,31 @@ function renderCloture(){
   $("cl-in").textContent  = money(t.espIn);
   $("cl-out").textContent = money(t.espOut);
   $("cl-theo").textContent = money(t.soldeEspeces);
+  $("cl-theo-chq").textContent = money(t.soldeCheques);
 
   const c = getCloture(key);
   if (c){
     $("cl-form").hidden = true;
     const done = $("cl-done");
     done.hidden = false;
-    const nul = Math.abs(c.ecart) < 0.005;
+    const nul = Math.abs(c.ecart) < 0.005 && Math.abs(c.ecartCheque || 0) < 0.005;
     done.className = "cl-done" + (nul ? "" : " ko");
     const dt = c.closedAt ? new Date(c.closedAt) : null;
     done.innerHTML =
       "<h3>Journée clôturée" + (nul ? " · caisse juste" : " · écart constaté") + "</h3>" +
-      '<div class="row"><span>Théorique</span><b>' + money(c.theorique) + "</b></div>" +
-      '<div class="row"><span>Comptage réel</span><b>' + money(c.comptage) + "</b></div>" +
-      '<div class="row"><span>Écart</span><b>' + (c.ecart > 0 ? "+ " : "") + money(c.ecart) + "</b></div>" +
+      '<div class="row"><span>Théorique espèces</span><b>' + money(c.theorique) + "</b></div>" +
+      '<div class="row"><span>Comptage espèces</span><b>' + money(c.comptage) + "</b></div>" +
+      '<div class="row"><span>Écart espèces</span><b>' + signMoney(c.ecart) + "</b></div>" +
+      '<div class="row"><span>Théorique chèques</span><b>' + money(c.theoriqueCheque || 0) + "</b></div>" +
+      '<div class="row"><span>Comptage chèques</span><b>' + money(c.comptageCheque || 0) + " (" + (c.nbCheque || 0) + ")</b></div>" +
+      '<div class="row"><span>Écart chèques</span><b>' + signMoney(c.ecartCheque || 0) + "</b></div>" +
       '<div class="row"><span>Clôturé par</span><b>' + esc(c.operateur || "—") + "</b></div>" +
       (dt ? '<div class="row"><span>Le</span><b>' + frDate(dt) + " " + frTime(dt) + "</b></div>" : "");
   } else {
     $("cl-form").hidden = false;
     $("cl-done").hidden = true;
     updateEcart();
+    updateEcartChq();
   }
 }
 
@@ -127,7 +168,7 @@ function applyRoleUI(){
   if (!admin){ scope = "day"; typeFilter = "all"; }
 }
 
-// ───────── formulaire ─────────
+// ───────── formulaire saisie ─────────
 function clearForm(keepTypeMode){
   ["montant", "ndoc", "nom", "prenom", "nchq", "banque"].forEach(id => { $(id).value = ""; });
   $("err").textContent = "";
@@ -174,17 +215,72 @@ async function doSave(){
   }
 }
 
+// ───────── remise compta ─────────
+function openRemise(){
+  const t = computeTotals();
+  $("rm-th-esp").textContent = money(t.soldeEspeces);
+  $("rm-th-chq").textContent = money(t.soldeCheques);
+  $("rm-esp").value = ""; $("rm-chq").value = ""; $("rm-err").textContent = "";
+  $("remiseModal").hidden = false;
+}
+async function doRemise(){
+  const esp = parseAmt($("rm-esp").value), chq = parseAmt($("rm-chq").value);
+  const e = isNaN(esp) ? 0 : esp, c = isNaN(chq) ? 0 : chq;
+  if (e <= 0 && c <= 0){ $("rm-err").textContent = "Indique un montant espèces et/ou chèques."; return; }
+  const btn = $("rm-save"), label = btn.textContent;
+  btn.disabled = true; btn.textContent = "…";
+  try { await addRemise(e, c); $("remiseModal").hidden = true; toast("Remise enregistrée"); }
+  catch (err) { console.error(err); $("rm-err").textContent = "Enregistrement impossible — vérifie la connexion."; }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+
+// ───────── vérifier la caisse (à blanc) ─────────
+function setEcartBox(box, b, ec){
+  b.textContent = signMoney(ec);
+  const nul = Math.abs(ec) < 0.005;
+  box.classList.toggle("ok", nul); box.classList.toggle("ko", !nul);
+}
+function updateCheck(){
+  const t = computeTotals();
+  const cash = sumDenom("ck");
+  $("ck-cash-total").textContent = money(cash);
+  $("ck-cash-theo").textContent = money(t.soldeEspeces);
+  setEcartBox($("ck-cash-ecartBox"), $("ck-cash-ecart"), cash - t.soldeEspeces);
+  $("ck-chq-theo").textContent = money(t.soldeCheques);
+  const chq = parseAmt($("ck-chq-total").value);
+  if (isNaN(chq)){ $("ck-chq-ecart").textContent = "—"; $("ck-chq-ecartBox").classList.remove("ok", "ko"); }
+  else setEcartBox($("ck-chq-ecartBox"), $("ck-chq-ecart"), chq - t.soldeCheques);
+}
+function openCheck(){
+  if (!ckBuilt){
+    buildDenom("ck", $("ck-denom"));
+    $("ck-denom").addEventListener("input", updateCheck);
+    $("ck-chq-total").addEventListener("input", updateCheck);
+    ckBuilt = true;
+  }
+  resetDenom("ck");
+  $("ck-chq-nb").value = ""; $("ck-chq-total").value = "";
+  updateCheck();
+  $("checkModal").hidden = false;
+}
+
 // ───────── clôture ─────────
 async function doCloture(){
-  const v = parseAmt($("cl-reel").value);
-  if (isNaN(v) || v < 0){ toast("Saisis le comptage réel"); $("cl-reel").focus(); return; }
-  const theo = computeTotals().soldeEspeces;
-  const ec = v - theo;
-  if (!window.confirm("Clôturer la journée ?\nThéorique " + num2(theo) + " € · Comptage " + num2(v) +
-      " € · Écart " + num2(ec) + " €.\nLa clôture est définitive.")) return;
+  const esp = parseAmt($("cl-reel").value);
+  if (isNaN(esp) || esp < 0){ toast("Saisis le comptage espèces"); $("cl-reel").focus(); return; }
+  const chq = parseAmt($("cl-chq-total").value);
+  const compChq = isNaN(chq) ? 0 : chq;
+  const nb = parseInt($("cl-chq-nb").value, 10) || 0;
+  const t = computeTotals();
+  const ecEsp = esp - t.soldeEspeces, ecChq = compChq - t.soldeCheques;
+  if (!window.confirm(
+    "Clôturer la journée ?\n" +
+    "Espèces — théorique " + num2(t.soldeEspeces) + " · compté " + num2(esp) + " · écart " + num2(ecEsp) + "\n" +
+    "Chèques — théorique " + num2(t.soldeCheques) + " · compté " + num2(compChq) + " · écart " + num2(ecChq) + "\n" +
+    "La clôture est définitive.")) return;
   const btn = $("cl-save"), label = btn.textContent;
   btn.disabled = true; btn.textContent = "Clôture…";
-  try { await addCloture(v); toast("Journée clôturée"); }
+  try { await addCloture({ comptageEspeces: esp, comptageCheques: compChq, nbCheques: nb }); toast("Journée clôturée"); }
   catch (e) { console.error(e); toast("Clôture impossible (déjà clôturée ?)"); }
   finally { btn.disabled = false; btn.textContent = label; }
 }
@@ -213,12 +309,12 @@ async function exportXlsx(){
   catch (e) { toast("Export .xlsx indisponible (connexion requise)"); return; }
   const XLSX = mod.default || mod;
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ops), "Opérations");
-  const cl = exportCloturesRows(scope);
-  if (cl.length > 1) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cl), "Clôtures");
+  const add = (rows, name) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), name);
+  add(ops, "Opérations");
+  const cl = exportCloturesRows(scope); if (cl.length > 1) add(cl, "Clôtures");
   if (isAdmin()){
-    const fa = exportFacturesRows(scope);
-    if (fa.length > 1) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(fa), "Factures");
+    const fa = exportFacturesRows(scope); if (fa.length > 1) add(fa, "Factures");
+    const re = exportRemisesRows(scope); if (re.length > 1) add(re, "Remises");
   }
   XLSX.writeFile(wb, "caisse_AJCV_" + todayKey() + ".xlsx");
 }
@@ -237,8 +333,55 @@ function tick(){
 }
 function banner(msg){ const b = $("banner"); b.textContent = msg; b.classList.add("show"); }
 
+// ───────── mot de passe (reset + paramètres) ─────────
+function openSetPwd(mode){
+  setpwdMode = mode;
+  $("sp-title").textContent = mode === "recovery" ? "Nouveau mot de passe" : "Changer mon mot de passe";
+  $("sp-cancel").hidden = (mode === "recovery");
+  $("sp-err").textContent = ""; $("sp-info").textContent = "";
+  $("sp-pwd").value = ""; $("sp-pwd2").value = "";
+  $("login").hidden = true;
+  $("setpwd").hidden = false;
+}
+function closeSetPwd(){ $("setpwd").hidden = true; }
+async function doSetPwd(){
+  const p1 = $("sp-pwd").value, p2 = $("sp-pwd2").value;
+  $("sp-err").textContent = ""; $("sp-info").textContent = "";
+  if ((p1 || "").length < 6){ $("sp-err").textContent = "6 caractères minimum."; return; }
+  if (p1 !== p2){ $("sp-err").textContent = "Les deux mots de passe ne correspondent pas."; return; }
+  const btn = $("sp-btn"), label = btn.textContent;
+  btn.disabled = true; btn.textContent = "…";
+  try {
+    const { error } = await auth.updatePassword(sb, p1);
+    if (error){ $("sp-err").textContent = "Échec : " + error.message; }
+    else {
+      $("sp-info").textContent = "Mot de passe enregistré.";
+      $("sp-pwd").value = ""; $("sp-pwd2").value = "";
+      if (setpwdMode === "recovery") setTimeout(() => location.replace(location.origin + location.pathname), 900);
+      else setTimeout(closeSetPwd, 900);
+    }
+  } catch (e) { $("sp-err").textContent = "Échec. Réessaie."; }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+async function doForgot(){
+  const email = $("lg-email").value.trim();
+  $("lg-err").textContent = ""; $("lg-info").textContent = "";
+  if (!email){ $("lg-err").textContent = "Saisis d'abord ton e-mail ci-dessus."; return; }
+  const redirectTo = location.origin + location.pathname;
+  try {
+    await auth.resetPassword(sb, email, redirectTo);
+    $("lg-info").textContent = "Si un compte existe, un e-mail de réinitialisation a été envoyé.";
+  } catch (e) { $("lg-err").textContent = "Envoi impossible. Réessaie."; }
+}
+
 // ───────── câblage statique ─────────
 function wireUI(){
+  buildDenom("cl", $("cl-denom"));
+  $("cl-denom").addEventListener("input", () => { $("cl-reel").value = num2(sumDenom("cl")); updateEcart(); });
+  $("cl-reel").addEventListener("input", updateEcart);
+  $("cl-chq-total").addEventListener("input", updateEcartChq);
+  $("cl-save").addEventListener("click", doCloture);
+
   $("seg-type").addEventListener("click", ev => {
     const b = ev.target.closest("button"); if (!b) return;
     form.type = b.dataset.type;
@@ -283,8 +426,13 @@ function wireUI(){
     copyText(toTSV(rows.slice(1)));
   });
 
-  $("cl-reel").addEventListener("input", updateEcart);
-  $("cl-save").addEventListener("click", doCloture);
+  // remise + vérif caisse
+  $("btn-remise").addEventListener("click", openRemise);
+  $("rm-close").addEventListener("click", () => { $("remiseModal").hidden = true; });
+  $("rm-save").addEventListener("click", doRemise);
+  $("btn-check").addEventListener("click", openCheck);
+  $("ck-close").addEventListener("click", () => { $("checkModal").hidden = true; });
+  $("ck-done").addEventListener("click", () => { $("checkModal").hidden = true; });
 
   $("list").addEventListener("click", async ev => {
     const b = ev.target.closest("[data-fix]"); if (!b) return;
@@ -296,10 +444,14 @@ function wireUI(){
     }
   });
 
-  // login / logout
+  // auth
   $("lg-btn").addEventListener("click", doLogin);
   $("lg-pwd").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+  $("lg-forgot").addEventListener("click", doForgot);
   $("signout").addEventListener("click", async () => { if (sb) await auth.signOut(sb); });
+  $("account").addEventListener("click", () => openSetPwd("account"));
+  $("sp-btn").addEventListener("click", doSetPwd);
+  $("sp-cancel").addEventListener("click", closeSetPwd);
 }
 
 // ───────── modes ─────────
@@ -349,7 +501,7 @@ async function handleSession(session){
   $("userbox").hidden = false;
 
   $("oper").value = state.operateur;
-  $("oper").readOnly = true;   // en mode connecté, l'opérateur = l'utilisateur
+  $("oper").readOnly = true;
 
   applyRoleUI();
   try { await hydrate(); }
@@ -368,11 +520,10 @@ async function doLogin(){
   const email = $("lg-email").value.trim(), pwd = $("lg-pwd").value;
   if (!email || !pwd){ $("lg-err").textContent = "Renseigne l'e-mail et le mot de passe."; return; }
   const btn = $("lg-btn"), label = btn.textContent;
-  btn.disabled = true; btn.textContent = "Connexion…"; $("lg-err").textContent = "";
+  btn.disabled = true; btn.textContent = "Connexion…"; $("lg-err").textContent = ""; $("lg-info").textContent = "";
   try {
     const { error } = await auth.signIn(sb, email, pwd);
     if (error) $("lg-err").textContent = authError(error.message);
-    // succès -> onAuthChange charge l'appli
   } catch (e) {
     $("lg-err").textContent = "Connexion impossible. Réessaie.";
   } finally {
@@ -392,9 +543,17 @@ async function startSupabase(){
   const { createSupabaseStore } = await import("./storage.supabase.js");
   useAdapter(createSupabaseStore(sb));
 
-  auth.onAuthChange(sb, s => { handleSession(s); });
-  const session = await auth.getSession(sb);
-  await handleSession(session);
+  const isRecovery = location.hash.indexOf("type=recovery") !== -1;
+
+  auth.onAuthChange(sb, (event, s) => {
+    if (event === "PASSWORD_RECOVERY"){ openSetPwd("recovery"); return; }
+    if (isRecovery) return;       // pendant une récupération, on ignore les autres événements
+    handleSession(s);
+  });
+
+  if (isRecovery) openSetPwd("recovery");
+  else await handleSession(await auth.getSession(sb));
+
   $("appwrap").style.visibility = "visible";
 }
 

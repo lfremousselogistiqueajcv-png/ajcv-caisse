@@ -1,31 +1,30 @@
--- AJCV Caisse — rôles & noms affichés des comptes
---
--- ÉTAPE 1 — créer les comptes (Supabase ▸ Authentication ▸ Users ▸ Add user)
---   Coche "Auto Confirm User" pour qu'ils puissent se connecter tout de suite,
---   et définis un mot de passe pour chacun. Remplace les e-mails ci-dessous par
---   les vrais. Le trigger crée automatiquement un profil (rôle caissier).
---
--- ÉTAPE 2 — exécuter ce script (SQL Editor) pour fixer rôles + noms affichés.
---   On met à jour public.profiles en faisant la jointure sur l'e-mail.
+-- AJCV Caisse — rôles & noms affichés (SCRIPT 2)
+-- À lancer APRÈS schema.sql et APRÈS avoir créé les 5 comptes (Authentication ▸ Add user).
+-- Le bloc 1 garantit qu'un profil existe pour chaque compte, quel que soit l'ordre.
 
--- ── Administrateurs (accès complet : tout voir, factures, export) ──
+-- 1) Profil pour chaque compte existant qui n'en a pas encore
+insert into public.profiles (id, display_name)
+select u.id, split_part(u.email, '@', 1)
+from auth.users u
+on conflict (id) do nothing;
+
+-- 2) Rôles + noms affichés
 update public.profiles p set role = 'admin', display_name = 'Laurent (admin)'
-from auth.users u where u.id = p.id and u.email = 'laurent.admin@ajcv.re';
+from auth.users u where u.id = p.id and u.email = 'lfremousselogistiqueajcv@gmail.com';
 
 update public.profiles p set role = 'admin', display_name = 'Comptabilité'
-from auth.users u where u.id = p.id and u.email = 'compta@ajcv.re';
+from auth.users u where u.id = p.id and u.email = 'sarl.ajcv@gmail.com';
 
--- ── Caissiers (saisie + journal du jour + clôture) ──
 update public.profiles p set role = 'caissier', display_name = 'Jean Fred'
-from auth.users u where u.id = p.id and u.email = 'jeanfred@ajcv.re';
+from auth.users u where u.id = p.id and u.email = 'jfgrondin.ajcv@gmail.com';
 
 update public.profiles p set role = 'caissier', display_name = 'Clément'
-from auth.users u where u.id = p.id and u.email = 'clement@ajcv.re';
+from auth.users u where u.id = p.id and u.email = 'cbenard.livreurajcv@gmail.com';
 
 update public.profiles p set role = 'caissier', display_name = 'Laurent'
-from auth.users u where u.id = p.id and u.email = 'laurent@ajcv.re';
+from auth.users u where u.id = p.id and u.email = 'sav.ajcv@gmail.com';
 
--- Vérification
+-- 3) Vérification (doit renvoyer 5 lignes : 2 admin, 3 caissier)
 select u.email, pr.display_name, pr.role
 from public.profiles pr join auth.users u on u.id = pr.id
 order by pr.role, pr.display_name;

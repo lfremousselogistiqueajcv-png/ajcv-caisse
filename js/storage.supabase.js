@@ -30,6 +30,8 @@ export function createSupabaseStore(sb){
       dateKey: r.op_date, date: frDate(new Date(r.op_date + "T00:00:00")),
       fond: Number(r.fond), theorique: Number(r.theorique),
       comptage: Number(r.comptage), ecart: Number(r.ecart),
+      theoriqueCheque: Number(r.theorique_cheque || 0), comptageCheque: Number(r.comptage_cheque || 0),
+      nbCheque: Number(r.nb_cheque || 0), ecartCheque: Number(r.ecart_cheque || 0),
       operateur: r.operateur || "", closedAt: r.created_at
     };
   }
@@ -74,7 +76,10 @@ export function createSupabaseStore(sb){
     async createCloture(c){
       const row = {
         op_date: c.dateKey, fond: c.fond, theorique: c.theorique,
-        comptage: c.comptage, ecart: c.ecart, operateur: c.operateur || null
+        comptage: c.comptage, ecart: c.ecart,
+        theorique_cheque: c.theoriqueCheque || 0, comptage_cheque: c.comptageCheque || 0,
+        nb_cheque: c.nbCheque || 0, ecart_cheque: c.ecartCheque || 0,
+        operateur: c.operateur || null
       };
       const { data, error } = await sb
         .from("caisse_clotures").insert(row).select().single();
