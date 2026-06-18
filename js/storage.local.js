@@ -69,6 +69,11 @@ export function createLocalStore(){
       data.clotures[c.dateKey] = c;       // une clôture par jour
       persist();
       return c;
+    },
+
+    async reset(){
+      data = { entries: [], fonds: {}, fondsLocked: {}, clotures: {}, counter: 0 };
+      persist();
     }
   };
 }

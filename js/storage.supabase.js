@@ -105,6 +105,12 @@ export function createSupabaseStore(sb){
         .from("caisse_clotures").insert(row).select().single();
       if (error) throw error;
       return clFromRow(data);
+    },
+
+    // Réinitialisation complète : fonction serveur SECURITY DEFINER, réservée à l'admin
+    async reset(){
+      const { error } = await sb.rpc("reset_caisse");
+      if (error) throw error;
     }
   };
 }

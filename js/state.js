@@ -4,7 +4,8 @@
 import { todayKey, frDate, frTime, p3, num2 } from "./format.js";
 
 export const TYPES = {
-  facture: { label: "Facture",          sens: 1,  cls: "facture" },
+  facture: { label: "Facture vente",    sens: 1,  cls: "facture" },
+  achat:   { label: "Facture achat",    sens: -1, cls: "achat" },
   sortie:  { label: "Sortie de caisse", sens: -1, cls: "sortie" },
   retour:  { label: "Retour d'argent",  sens: -1, cls: "retour" },
   remise:  { label: "Remise compta",    sens: -1, cls: "remise" },
@@ -63,19 +64,48 @@ export async function reversal(id){
   });
 }
 
-// Remise à la comptabilité : décrémente la caisse (espèces) et le portefeuille chèques.
-// Crée une opération par mode concerné (espèces et/ou chèque), type "remise".
+// Chèques physiquement en caisse aujourd'hui : encaissements par chèque (factures)
+// non encore remis ni contre-passés.
+export function chequesEnCaisse(key){
+  key = key || todayKey();
+  const sortis = new Set();
+  state.entries.forEach(e => {
+    if ((e.typeKey === "remise" || e.typeKey === "contre") && e.refSeq) sortis.add(e.refSeq);
+  });
+  return state.entries
+    .filter(e => e.dateKey === key && e.typeKey === "facture" && e.mode === "Chèque" && !sortis.has(e.seq))
+    .map(e => ({ seq: e.seq, nchq: e.nchq, montant: e.montant, nom: e.nom, prenom: e.prenom }))
+    .sort((a, b) => a.seq - b.seq);
+}
+
+// Remise à la comptabilité : décrémente la caisse.
+//   especes : montant en espèces (number)
+//   cheques : tableau [{ montant, nchq, nom, seq }] des chèques remis (sélectionnés)
+// Crée 1 opération "remise" pour les espèces + 1 par chèque (chacune liée au chèque d'origine).
 export async function addRemise(especes, cheques){
   const created = [];
-  const e = +especes || 0, c = +cheques || 0;
+  const e = +especes || 0;
   if (e > 0) created.push(await addEntry({ typeKey: "remise", mode: "Espèces", montant: e, nom: "Comptabilité" }));
-  if (c > 0) created.push(await addEntry({ typeKey: "remise", mode: "Chèque",  montant: c, nom: "Comptabilité" }));
+  for (const c of (cheques || [])){
+    if (+c.montant > 0) created.push(await addEntry({
+      typeKey: "remise", mode: "Chèque", montant: +c.montant,
+      nchq: c.nchq || "", nom: c.nom || "Comptabilité", refSeq: c.seq || null
+    }));
+  }
   return created;
 }
 
 export function setOperateur(v){ state.operateur = v || ""; }
 export function setRole(r){ state.role = r || "local"; }
 export function isAdmin(){ return state.role === "admin" || state.role === "local"; }
+
+// Réinitialisation complète (réservée admin). Efface opérations, fonds et clôtures.
+// En Supabase, l'effacement passe par une fonction serveur qui vérifie le rôle admin.
+export async function resetAll(){
+  if (adapter && adapter.reset) await adapter.reset();
+  state.entries = []; state.fonds = {}; state.fondsLocked = {}; state.clotures = {};
+  emit();
+}
 
 // Photos : délégué à l'adaptateur (Supabase Storage en ligne, data URL en local)
 export async function uploadPhoto(blob){ return adapter && adapter.uploadPhoto ? adapter.uploadPhoto(blob) : ""; }
@@ -178,8 +208,21 @@ export function exportFacturesRows(scope){  // uniquement les encaissements de t
   return rows;
 }
 
-export function exportRemisesRows(scope){   // remises à la comptabilité
+export function exportAchatsRows(scope){    // factures d'achat (sorties)
   const key = todayKey();
+  const rows = [["Date", "Heure", "N° Facture", "Fournisseur", "Montant", "Mode", "Opérateur"]];
+  state.entries.slice().reverse().forEach(e => {
+    if (e.typeKey !== "achat") return;
+    if (scope === "day" && e.dateKey !== key) return;
+    rows.push([
+      e.date, e.heure, e.ndoc, (e.nom + " " + (e.prenom || "")).trim(),
+      num2(e.montant), e.mode, e.operateur
+    ]);
+  });
+  return rows;
+}
+
+export function exportRemisesRows(scope){   // remises à la comptabilité  const key = todayKey();
   const rows = [["Date", "Heure", "Mode", "Montant", "Opérateur"]];
   state.entries.slice().reverse().forEach(e => {
     if (e.typeKey !== "remise") return;

@@ -50,7 +50,7 @@ create table if not exists public.caisse_operations (
   user_id     uuid not null default auth.uid(),      -- auteur réel (audit)
   op_date     date  not null,
   op_time     text  not null,
-  type        text  not null check (type in ('facture','sortie','retour','remise','contre')),
+  type        text  not null check (type in ('facture','achat','sortie','retour','remise','contre')),
   sens        smallint not null check (sens in (-1, 1)),
   montant     numeric(12,2) not null check (montant >= 0),
   mode        text,
@@ -160,3 +160,22 @@ create policy caisse_photos_insert on storage.objects
 -- ─────────────────────────────────────────────────────────────
 -- La clé "anon public" peut figurer dans le frontend (la sécurité repose sur
 -- l'authentification + ces policies). La clé "service_role" ne doit JAMAIS y être.
+
+-- ─────────────────────────────────────────────────────────────
+-- Réinitialisation complète (réservée ADMIN)
+-- Le journal reste append-only via l'API ; seule cette fonction (qui vérifie
+-- le rôle admin) peut tout effacer, pour repartir de zéro après des tests.
+-- ─────────────────────────────────────────────────────────────
+create or replace function public.reset_caisse()
+returns void language plpgsql security definer
+set search_path = public as $$
+begin
+  if public.user_role() <> 'admin' then
+    raise exception 'Réinitialisation réservée aux administrateurs';
+  end if;
+  delete from public.caisse_operations;
+  delete from public.caisse_fonds;
+  delete from public.caisse_clotures;
+  delete from storage.objects where bucket_id = 'caisse-photos';
+end $$;
+grant execute on function public.reset_caisse() to authenticated;

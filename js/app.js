@@ -5,16 +5,16 @@ import { CONFIG } from "./config.js";
 import { money, num2, parseAmt, esc, frDate, frTime, todayKey } from "./format.js";
 import {
   TYPES, state, useAdapter, onChange, hydrate,
-  addEntry, reversal, addRemise, setOperateur, setRole, isAdmin,
-  computeTotals, getCloture, addCloture,
-  exportRows, exportFacturesRows, exportRemisesRows, exportCloturesRows,
+  addEntry, reversal, addRemise, chequesEnCaisse, setOperateur, setRole, isAdmin,
+  computeTotals, getCloture, addCloture, resetAll,
+  exportRows, exportFacturesRows, exportAchatsRows, exportRemisesRows, exportCloturesRows,
   persistFond, lockFond, isFondLocked, uploadPhoto, photoUrl
 } from "./state.js";
 import * as prefs from "./prefs.js";
 import * as auth from "./auth.js";
 import { createLocalStore } from "./storage.local.js";
 
-const TYPE_COLOR = { facture: "#0E8A5F", sortie: "#C9760A", retour: "#C2334D", remise: "#5B62B5", contre: "#15233F" };
+const TYPE_COLOR = { facture: "#0E8A5F", achat: "#9C4221", sortie: "#C9760A", retour: "#C2334D", remise: "#5B62B5", contre: "#15233F" };
 const DENOMS = [50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1]; // centimes
 const $ = id => document.getElementById(id);
 
@@ -243,6 +243,7 @@ function applyRoleUI(){
   const admin = isAdmin();
   $("scope").hidden = !admin;
   $("filters").hidden = !admin;
+  $("btn-reset").hidden = !admin;
   if (!admin){ scope = "day"; typeFilter = "all"; }
 }
 
@@ -265,7 +266,7 @@ function validate(){
   if (isNaN(m) || m <= 0) return "Saisis un montant supérieur à 0.";
   if (!form.mode) return "Choisis un mode de règlement.";
   if (!$("nom").value.trim()) return "Le nom est obligatoire.";
-  if ((form.type === "facture" || form.type === "retour") && !$("ndoc").value.trim())
+  if ((form.type === "facture" || form.type === "achat" || form.type === "retour") && !$("ndoc").value.trim())
     return "Le n° de document est obligatoire pour ce type.";
   if (form.mode === "Chèque" && !$("nchq").value.trim()) return "Indique le n° du chèque.";
   return "";
@@ -304,20 +305,50 @@ async function doSave(){
 }
 
 // ───────── remise compta ─────────
+function updateRemiseChqSum(){
+  let sum = 0, n = 0;
+  $("rm-chq-list").querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+    sum += parseFloat(cb.dataset.montant) || 0; n++;
+  });
+  $("rm-chq-sum").textContent = money(sum) + " · " + n + " chèque" + (n > 1 ? "s" : "");
+  return { sum, n };
+}
 function openRemise(){
   const t = computeTotals();
   $("rm-th-esp").textContent = money(t.soldeEspeces);
   $("rm-th-chq").textContent = money(t.soldeCheques);
-  $("rm-esp").value = ""; $("rm-chq").value = ""; $("rm-err").textContent = "";
+  $("rm-esp").value = ""; $("rm-err").textContent = ""; $("rm-esp-warn").hidden = true;
+  const cheques = chequesEnCaisse();
+  const host = $("rm-chq-list");
+  if (!cheques.length){
+    host.innerHTML = '<div class="rm-empty">Aucun chèque en caisse aujourd\'hui.</div>';
+  } else {
+    host.innerHTML = cheques.map(rmChqRow).join("");
+  }
+  updateRemiseChqSum();
   $("remiseModal").hidden = false;
 }
+function rmChqRow(c){
+  const who = (esc(c.nom || "") + (c.prenom ? (" " + esc(c.prenom)) : "")).trim();
+  return '<label class="rm-chq-row"><input type="checkbox" data-seq="' + c.seq + '" data-montant="' + c.montant + '">' +
+    '<span class="rm-chq-info"><b>N° ' + esc(c.nchq || "—") + "</b>" +
+    (who ? (" · " + who) : "") + ' · <span class="rm-chq-amt">' + money(c.montant) + "</span></span></label>";
+}
 async function doRemise(){
-  const esp = parseAmt($("rm-esp").value), chq = parseAmt($("rm-chq").value);
-  const e = isNaN(esp) ? 0 : esp, c = isNaN(chq) ? 0 : chq;
-  if (e <= 0 && c <= 0){ $("rm-err").textContent = "Indique un montant espèces et/ou chèques."; return; }
+  const esp = parseAmt($("rm-esp").value); const e = isNaN(esp) ? 0 : esp;
+  const checked = [...$("rm-chq-list").querySelectorAll('input[type="checkbox"]:checked')];
+  const cheques = checked.map(cb => {
+    const seq = parseInt(cb.dataset.seq, 10);
+    const src = state.entries.find(x => x.seq === seq);
+    return { seq, montant: parseFloat(cb.dataset.montant) || 0, nchq: src ? src.nchq : "", nom: src ? src.nom : "" };
+  });
+  if (e <= 0 && !cheques.length){ $("rm-err").textContent = "Indique des espèces et/ou coche des chèques."; return; }
+  const t = computeTotals();
+  if (e > t.soldeEspeces + 0.005 &&
+      !window.confirm("Tu remets " + num2(e) + " € d'espèces alors que la caisse en contient " + num2(t.soldeEspeces) + " €.\nContinuer ?")) return;
   const btn = $("rm-save"), label = btn.textContent;
   btn.disabled = true; btn.textContent = "…";
-  try { await addRemise(e, c); $("remiseModal").hidden = true; toast("Remise enregistrée"); }
+  try { await addRemise(e, cheques); $("remiseModal").hidden = true; toast("Remise enregistrée"); }
   catch (err) { console.error(err); $("rm-err").textContent = "Enregistrement impossible — vérifie la connexion."; }
   finally { btn.disabled = false; btn.textContent = label; }
 }
@@ -401,7 +432,8 @@ async function exportXlsx(){
   add(ops, "Opérations");
   const cl = exportCloturesRows(scope); if (cl.length > 1) add(cl, "Clôtures");
   if (isAdmin()){
-    const fa = exportFacturesRows(scope); if (fa.length > 1) add(fa, "Factures");
+    const fa = exportFacturesRows(scope); if (fa.length > 1) add(fa, "Ventes");
+    const ac = exportAchatsRows(scope); if (ac.length > 1) add(ac, "Achats");
     const re = exportRemisesRows(scope); if (re.length > 1) add(re, "Remises");
   }
   XLSX.writeFile(wb, "caisse_AJCV_" + todayKey() + ".xlsx");
@@ -460,6 +492,25 @@ async function doForgot(){
     await auth.resetPassword(sb, email, redirectTo);
     $("lg-info").textContent = "Si un compte existe, un e-mail de réinitialisation a été envoyé.";
   } catch (e) { $("lg-err").textContent = "Envoi impossible. Réessaie."; }
+}
+
+// ───────── réinitialisation (admin) ─────────
+async function doReset(){
+  if (!isAdmin()) return;
+  if (!window.confirm("Tout effacer ?\nToutes les opérations, fonds et clôtures seront définitivement supprimés.\nAction irréversible.")) return;
+  const word = window.prompt("Pour confirmer, tape EFFACER en majuscules :");
+  if ((word || "").trim().toUpperCase() !== "EFFACER"){ toast("Réinitialisation annulée"); return; }
+  const btn = $("btn-reset"), label = btn.textContent;
+  btn.disabled = true; btn.textContent = "Effacement…";
+  try {
+    await resetAll();
+    $("fond").value = ""; $("fond").readOnly = false;
+    clearForm(false);
+    toast("Tout a été réinitialisé");
+  } catch (e) {
+    console.error(e);
+    toast("Réinitialisation impossible (en ligne : la fonction SQL n'est pas encore installée)");
+  } finally { btn.disabled = false; btn.textContent = label; }
 }
 
 // ───────── fond de caisse (verrou) ─────────
@@ -535,9 +586,17 @@ function wireUI(){
   $("btn-remise").addEventListener("click", openRemise);
   $("rm-close").addEventListener("click", () => { $("remiseModal").hidden = true; });
   $("rm-save").addEventListener("click", doRemise);
+  $("rm-chq-list").addEventListener("change", updateRemiseChqSum);
+  $("rm-esp").addEventListener("input", () => {
+    const v = parseAmt($("rm-esp").value); const t = computeTotals();
+    const w = $("rm-esp-warn");
+    if (!isNaN(v) && v > t.soldeEspeces + 0.005){ w.textContent = "⚠ Supérieur aux espèces en caisse (" + money(t.soldeEspeces) + ")"; w.hidden = false; }
+    else w.hidden = true;
+  });
   $("btn-check").addEventListener("click", openCheck);
   $("ck-close").addEventListener("click", () => { $("checkModal").hidden = true; });
   $("ck-done").addEventListener("click", () => { $("checkModal").hidden = true; });
+  $("btn-reset").addEventListener("click", doReset);
 
   // photo du paiement
   $("photo-add").addEventListener("click", () => $("photo-file").click());

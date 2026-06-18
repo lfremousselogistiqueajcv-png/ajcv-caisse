@@ -54,7 +54,7 @@ body{
 /* form */
 .lbl-row{font-size:12px; font-weight:600; color:var(--ink-soft); margin:14px 0 7px; letter-spacing:.01em}
 .lbl-row:first-of-type{margin-top:0}
-.seg{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
+.seg{display:grid; grid-template-columns:1fr 1fr; gap:8px}
 .seg button{font:inherit; cursor:pointer; padding:11px 8px; border-radius:11px; border:1.5px solid var(--line);
   background:#fff; color:var(--ink-soft); font-weight:600; font-size:13px; line-height:1.2; transition:transform .08s, background .15s, border-color .15s, color .15s}
 .seg button .ico{display:block; font-family:var(--mono); font-size:15px; margin-bottom:2px}
@@ -265,3 +265,25 @@ input[readonly]{background:var(--surface); color:var(--muted); cursor:not-allowe
 .photo-view{margin-top:8px; min-height:120px; display:flex; align-items:center; justify-content:center}
 .photo-view img{max-width:100%; max-height:72vh; border-radius:10px; display:block}
 .ph-load{color:var(--muted); font-size:13px; padding:24px}
+
+/* ===== v4.1 : remise par sélection de chèques ===== */
+.rm-warn{color:var(--ret); font-size:12px; margin-top:6px}
+.rm-chq-list{display:flex; flex-direction:column; gap:6px; margin:8px 0 6px; max-height:34vh; overflow:auto}
+.rm-empty{border:1.5px dashed var(--line); border-radius:10px; padding:14px; text-align:center; color:var(--muted); font-size:13px}
+.rm-chq-row{display:flex; align-items:center; gap:10px; padding:9px 11px; border:1px solid var(--line);
+  border-radius:10px; background:#fff; cursor:pointer; font-size:13.5px}
+.rm-chq-row:hover{background:var(--surface)}
+.rm-chq-row input{width:18px; height:18px; flex:none; accent-color:var(--ink)}
+.rm-chq-info{display:flex; flex-wrap:wrap; gap:4px 8px; align-items:baseline}
+.rm-chq-info b{color:var(--ink); font-weight:700}
+.rm-chq-amt{font-family:var(--mono); font-weight:600; color:var(--ink)}
+
+/* ===== v5 : facture achat + réinitialisation admin ===== */
+.seg button.achat[aria-pressed="true"]{background:#F3E6DE; border-color:#9C4221; color:#9C4221}
+.ticket.achat{border-left-color:#9C4221}
+.ticket.achat .tk-type{color:#9C4221}
+.ticket.achat .tk-amt{color:#9C4221}
+
+#btn-reset{flex:1; min-width:150px; font:inherit; cursor:pointer; font-size:14px; font-weight:600;
+  color:var(--ret); background:var(--ret-soft); border:1px solid var(--ret); border-radius:11px; padding:11px 14px}
+#btn-reset:hover{filter:brightness(.98)}

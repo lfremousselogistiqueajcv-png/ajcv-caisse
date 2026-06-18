@@ -64,7 +64,7 @@
       <label for="fond">Fond de caisse du jour</label>
       <input id="fond" inputmode="decimal" placeholder="0,00" autocomplete="off">
       <div class="fond-foot">
-        <button type="button" id="fond-lock">Valider le fond</button>
+        <button type="button" id="fond-lock">Enregistrer le fond</button>
         <span class="fond-state" id="fond-state" hidden>🔒 validé · verrouillé</span>
       </div>
     </div>
@@ -80,6 +80,7 @@
     <div class="dash-actions">
       <button type="button" id="btn-remise">Remise compta</button>
       <button type="button" id="btn-check">Vérifier la caisse</button>
+      <button type="button" id="btn-reset" hidden>Réinitialiser (tout effacer)</button>
     </div>
   </section>
 
@@ -91,7 +92,8 @@
 
       <div class="lbl-row">Type de document</div>
       <div class="seg" id="seg-type">
-        <button type="button" class="facture" data-type="facture" aria-pressed="false"><span class="ico">+</span>Facture</button>
+        <button type="button" class="facture" data-type="facture" aria-pressed="false"><span class="ico">+</span>Facture vente</button>
+        <button type="button" class="achat"   data-type="achat"   aria-pressed="false"><span class="ico">−</span>Facture achat</button>
         <button type="button" class="sortie"  data-type="sortie"  aria-pressed="false"><span class="ico">−</span>Sortie de caisse</button>
         <button type="button" class="retour"  data-type="retour"  aria-pressed="false"><span class="ico">↩</span>Retour d'argent</button>
       </div>
@@ -150,7 +152,8 @@
       </div>
       <div class="filters" id="filters" hidden>
         <button type="button" data-filter="all" aria-pressed="true">Tout</button>
-        <button type="button" data-filter="facture" aria-pressed="false">Factures</button>
+        <button type="button" data-filter="facture" aria-pressed="false">Ventes</button>
+        <button type="button" data-filter="achat" aria-pressed="false">Achats</button>
         <button type="button" data-filter="sortie" aria-pressed="false">Sorties</button>
         <button type="button" data-filter="remise" aria-pressed="false">Remises</button>
         <button type="button" data-filter="retour" aria-pressed="false">Retours</button>
@@ -203,12 +206,17 @@
   <div class="modal-card">
     <div class="modal-h"><h2>Remise compta</h2><button type="button" class="modal-x" id="rm-close" aria-label="Fermer">✕</button></div>
     <p class="hint">Ce que tu remets à la comptabilité. La caisse est décrémentée d'autant.</p>
-    <div class="cl-line"><span>En caisse — espèces</span><b id="rm-th-esp">0,00 €</b></div>
-    <div class="cl-line"><span>En caisse — chèques</span><b id="rm-th-chq">0,00 €</b></div>
-    <div class="two" style="margin-top:12px">
-      <div class="inp"><label for="rm-esp">Espèces remises</label><input id="rm-esp" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
-      <div class="inp"><label for="rm-chq">Chèques remis (total)</label><input id="rm-chq" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
-    </div>
+
+    <div class="lbl-row">Espèces</div>
+    <div class="cl-line"><span>En caisse</span><b id="rm-th-esp">0,00 €</b></div>
+    <div class="inp" style="margin-top:8px"><label for="rm-esp">Espèces remises</label><input id="rm-esp" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
+    <div class="rm-warn" id="rm-esp-warn" hidden></div>
+
+    <div class="lbl-row" style="margin-top:14px">Chèques en caisse — coche ceux que tu remets</div>
+    <div class="cl-line"><span>Total en caisse</span><b id="rm-th-chq">0,00 €</b></div>
+    <div class="rm-chq-list" id="rm-chq-list"></div>
+    <div class="cl-line theo"><span>Total chèques remis</span><b id="rm-chq-sum">0,00 € · 0 chèque</b></div>
+
     <div class="err" id="rm-err"></div>
     <button class="save" id="rm-save">Valider la remise</button>
   </div>
