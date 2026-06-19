@@ -326,3 +326,8 @@ input[readonly]{background:var(--surface); color:var(--muted); cursor:not-allowe
 .chq-add{font:inherit; cursor:pointer; font-size:13px; font-weight:600; color:var(--ink); background:var(--accent-soft);
   border:1px dashed var(--line); border-radius:10px; padding:10px 14px}
 .chq-add:hover{filter:brightness(.97)}
+
+/* ===== v7 : alerte clôture non faite ===== */
+.cloture-alert{background:var(--ret-soft); border:1px solid var(--ret); color:#8a1f33; border-radius:12px;
+  padding:11px 14px; font-size:13px; font-weight:600; margin-bottom:14px; animation:rise .3s ease both}
+.cloture-alert[hidden]{display:none}

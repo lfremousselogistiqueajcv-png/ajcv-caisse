@@ -6,7 +6,7 @@ import { money, num2, parseAmt, esc, frDate, frTime, todayKey } from "./format.j
 import {
   TYPES, state, useAdapter, onChange, hydrate,
   addEntry, reversal, addRemise, chequesEnCaisse, setOperateur, setRole, isAdmin,
-  computeTotals, getCloture, addCloture, resetAll,
+  computeTotals, getCloture, addCloture, resetAll, unclosedDays,
   exportRows, exportFacturesRows, exportAchatsRows, exportRemisesRows, exportCloturesRows,
   persistFond, lockFond, isFondLocked, uploadPhoto, photoUrl
 } from "./state.js";
@@ -27,6 +27,9 @@ let booted = false;
 let setpwdMode = "account";
 let ckBuilt = false;
 let pendingPhoto = null;   // { blob, dataUrl } photo de l'opération en cours de saisie
+const LOGIN_KEY = "ajcv_caisse_login_at";
+const EIGHT_H = 8 * 60 * 60 * 1000;
+let sessionEnding = false;
 
 function supabaseConfigured(){
   return CONFIG.USE_SUPABASE && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY &&
@@ -267,7 +270,16 @@ function renderCloture(){
   }
 }
 
-function renderAll(){ renderFond(); renderDash(); renderList(); renderCloture(); }
+function renderClotureAlert(){
+  const days = unclosedDays();
+  const el = $("clotureAlert");
+  if (!days.length){ el.hidden = true; el.textContent = ""; return; }
+  const dates = days.map(d => frDate(new Date(d + "T00:00:00")));
+  el.textContent = "⚠ Caisse non clôturée pour " + (dates.length > 1 ? "les jours : " : "le ") + dates.join(", ") + ". Pense à la clôturer.";
+  el.hidden = false;
+}
+
+function renderAll(){ renderFond(); renderClotureAlert(); renderDash(); renderList(); renderCloture(); }
 
 // ───────── rôle / UI ─────────
 function applyRoleUI(){
@@ -487,6 +499,22 @@ function tick(){
   $("ck-time").textContent = frTime(d);
   $("ck-date").textContent = d.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" });
   $("cap").textContent = frDate(d) + " · " + frTime(d);
+  if (sb && currentUid && !sessionEnding){
+    let la = 0; try { la = parseInt(localStorage.getItem(LOGIN_KEY), 10); } catch (e) {}
+    if (la && Date.now() - la >= EIGHT_H){ sessionEnding = true; endSession(); }
+  }
+}
+async function endSession(){
+  const days = unclosedDays();
+  const todayOpen = state.entries.some(e => e.dateKey === todayKey()) && !getCloture(todayKey());
+  if (days.length || todayOpen){
+    const dates = days.map(d => frDate(new Date(d + "T00:00:00")));
+    window.alert("Session de 8 h écoulée — déconnexion.\nPense à clôturer la caisse" +
+      (dates.length ? (" (non clôturée : " + dates.join(", ") + ")") : "") + ".");
+  }
+  try { localStorage.removeItem(LOGIN_KEY); } catch (e) {}
+  try { if (sb) await auth.signOut(sb); } catch (e) {}
+  $("lg-info").textContent = "Déconnexion automatique après 8 h. Reconnecte-toi.";
 }
 function banner(msg){ const b = $("banner"); b.textContent = msg; b.classList.add("show"); }
 
@@ -659,7 +687,7 @@ function wireUI(){
   $("lg-btn").addEventListener("click", doLogin);
   $("lg-pwd").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
   $("lg-forgot").addEventListener("click", doForgot);
-  $("signout").addEventListener("click", async () => { if (sb) await auth.signOut(sb); });
+  $("signout").addEventListener("click", async () => { try { localStorage.removeItem(LOGIN_KEY); } catch (e) {} sessionEnding = false; if (sb) await auth.signOut(sb); });
   $("account").addEventListener("click", () => openSetPwd("account"));
   $("sp-btn").addEventListener("click", doSetPwd);
   $("sp-cancel").addEventListener("click", closeSetPwd);
@@ -701,6 +729,7 @@ async function handleSession(session){
   }
   $("login").hidden = true;
   $("lg-pwd").value = "";
+  try { if (!localStorage.getItem(LOGIN_KEY)) localStorage.setItem(LOGIN_KEY, "" + Date.now()); } catch (e) {}
 
   const prof = await auth.getProfile(sb, session.user.id);
   setRole(prof.role);
@@ -735,6 +764,7 @@ async function doLogin(){
   try {
     const { error } = await auth.signIn(sb, email, pwd);
     if (error) $("lg-err").textContent = authError(error.message);
+    else { try { localStorage.setItem(LOGIN_KEY, "" + Date.now()); } catch (e) {} sessionEnding = false; }
   } catch (e) {
     $("lg-err").textContent = "Connexion impossible. Réessaie.";
   } finally {

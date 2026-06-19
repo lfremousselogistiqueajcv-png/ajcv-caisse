@@ -152,6 +152,14 @@ export function computeTotals(key){
 // ---------- clôture quotidienne ----------
 export function getCloture(key){ key = key || todayKey(); return state.clotures[key] || null; }
 
+// Jours passés (avant aujourd'hui) qui ont des opérations mais pas de clôture.
+export function unclosedDays(){
+  const today = todayKey();
+  const days = new Set();
+  state.entries.forEach(e => { if (e.dateKey && e.dateKey < today) days.add(e.dateKey); });
+  return [...days].filter(d => !state.clotures[d]).sort();
+}
+
 // pl = { comptageEspeces, comptageCheques, nbCheques }
 export async function addCloture(pl, key){
   key = key || todayKey();
