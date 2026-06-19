@@ -95,6 +95,7 @@
     <!-- SAISIE -->
     <section class="card">
       <div class="card-h"><h2>Nouvelle opération</h2><span class="hint">Date et heure automatiques</span></div>
+      <div class="lock-note" id="lockNote" hidden>⚠ Valide d'abord le fond de caisse du jour (bouton « Enregistrer le fond ») pour pouvoir saisir des opérations.</div>
 
       <div class="lbl-row">Type de document</div>
       <div class="seg" id="seg-type">
@@ -193,10 +194,11 @@
         <div class="cl-ecart" id="cl-ecartBox"><span>Écart espèces</span><b id="cl-ecart">—</b></div>
       </div>
 
-      <div class="lbl-row" style="margin-top:14px">Comptage chèques</div>
-      <div class="cl-count">
-        <div class="inp"><label for="cl-chq-nb">Nombre</label><input id="cl-chq-nb" inputmode="numeric" placeholder="0" autocomplete="off"></div>
-        <div class="inp"><label for="cl-chq-total">Total chèques</label><input id="cl-chq-total" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
+      <div class="lbl-row" style="margin-top:14px">Comptage chèques — saisis chaque chèque</div>
+      <div class="chq-rows" id="cl-chq-rows"></div>
+      <button type="button" class="chq-add" id="cl-chq-add">+ Ajouter un chèque</button>
+      <div class="cl-count" style="margin-top:10px">
+        <div class="cl-line"><span>Total compté (<b id="cl-chq-nb">0</b> chèque(s))</span><b id="cl-chq-total">0,00 €</b></div>
         <div class="cl-ecart" id="cl-ecartBox-chq"><span>Écart chèques</span><b id="cl-ecart-chq">—</b></div>
       </div>
 
@@ -238,11 +240,10 @@
     <div class="cl-line theo"><span>Total compté espèces</span><b id="ck-cash-total">0,00 €</b></div>
     <div class="cl-line"><span>Théorique espèces</span><b id="ck-cash-theo">0,00 €</b></div>
     <div class="cl-ecart" id="ck-cash-ecartBox"><span>Écart espèces</span><b id="ck-cash-ecart">—</b></div>
-    <div class="lbl-row" style="margin-top:14px">Chèques</div>
-    <div class="two">
-      <div class="inp"><label for="ck-chq-nb">Nombre</label><input id="ck-chq-nb" inputmode="numeric" placeholder="0" autocomplete="off"></div>
-      <div class="inp"><label for="ck-chq-total">Total chèques</label><input id="ck-chq-total" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
-    </div>
+    <div class="lbl-row" style="margin-top:14px">Chèques — saisis chaque chèque</div>
+    <div class="chq-rows" id="ck-chq-rows"></div>
+    <button type="button" class="chq-add" id="ck-chq-add">+ Ajouter un chèque</button>
+    <div class="cl-line" style="margin-top:8px"><span>Total compté (<b id="ck-chq-nb">0</b>)</span><b id="ck-chq-total">0,00 €</b></div>
     <div class="cl-line"><span>Théorique chèques</span><b id="ck-chq-theo">0,00 €</b></div>
     <div class="cl-ecart" id="ck-chq-ecartBox"><span>Écart chèques</span><b id="ck-chq-ecart">—</b></div>
     <button type="button" class="save" id="ck-done">Fermer</button>

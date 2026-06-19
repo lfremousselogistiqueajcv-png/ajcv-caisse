@@ -58,6 +58,35 @@ function resetDenom(prefix){
   DENOMS.forEach(c => { const el = $(prefix + "-d-" + c); if (el) el.value = ""; const s = $(prefix + "-s-" + c); if (s) s.textContent = "0,00"; });
 }
 
+// ───────── comptage des chèques (une ligne par chèque : n° + montant) ─────────
+function chqRowHTML(){
+  return '<div class="chq-row">' +
+    '<input class="chq-n" inputmode="numeric" placeholder="N° chèque" autocomplete="off">' +
+    '<input class="chq-m" inputmode="decimal" placeholder="Montant €" autocomplete="off">' +
+    '<button type="button" class="chq-del" aria-label="Retirer ce chèque">✕</button></div>';
+}
+function addChqRow(prefix){ $(prefix + "-chq-rows").insertAdjacentHTML("beforeend", chqRowHTML()); }
+function resetChqRows(prefix){ $(prefix + "-chq-rows").innerHTML = chqRowHTML(); }
+function sumChqRows(prefix){
+  let total = 0, count = 0; const list = [];
+  $(prefix + "-chq-rows").querySelectorAll(".chq-row").forEach(r => {
+    const m = parseAmt(r.querySelector(".chq-m").value);
+    const n = (r.querySelector(".chq-n").value || "").trim();
+    if (!isNaN(m) && m > 0){ total += m; count++; list.push({ nchq: n, montant: m }); }
+  });
+  return { total, count, list };
+}
+function wireChqRows(prefix, onChange){
+  $(prefix + "-chq-add").addEventListener("click", () => { addChqRow(prefix); onChange(); });
+  $(prefix + "-chq-rows").addEventListener("input", onChange);
+  $(prefix + "-chq-rows").addEventListener("click", ev => {
+    const d = ev.target.closest(".chq-del"); if (!d) return;
+    d.closest(".chq-row").remove();
+    if (!$(prefix + "-chq-rows").querySelector(".chq-row")) addChqRow(prefix);
+    onChange();
+  });
+}
+
 // ───────── rendu ─────────
 function setAccent(t){ document.documentElement.style.setProperty("--accent", t ? TYPE_COLOR[t] : "#15233F"); }
 
@@ -75,6 +104,7 @@ function renderFond(){
   $("fond").readOnly = locked;
   $("fond-lock").hidden = locked;
   $("fond-state").hidden = !locked;
+  $("lockNote").hidden = locked;
 }
 
 // ───────── photo du paiement ─────────
@@ -191,10 +221,11 @@ function updateEcart(){
 }
 function updateEcartChq(){
   const theo = computeTotals().soldeCheques;
-  const v = parseAmt($("cl-chq-total").value);
+  const { total, count } = sumChqRows("cl");
+  $("cl-chq-total").textContent = money(total);
+  $("cl-chq-nb").textContent = count;
   const box = $("cl-ecartBox-chq");
-  if (isNaN(v)){ $("cl-ecart-chq").textContent = "—"; box.classList.remove("ok", "ko"); return; }
-  const ec = v - theo;
+  const ec = total - theo;
   $("cl-ecart-chq").textContent = signMoney(ec);
   const nul = Math.abs(ec) < 0.005;
   box.classList.toggle("ok", nul); box.classList.toggle("ko", !nul);
@@ -272,6 +303,7 @@ function validate(){
   return "";
 }
 async function doSave(){
+  if (!isFondLocked()){ $("err").textContent = "Valide d'abord le fond de caisse du jour (bouton « Enregistrer le fond »)."; return; }
   const msg = validate();
   if (msg){ $("err").textContent = msg; return; }
   const btn = $("save"), label = btn.textContent;
@@ -335,6 +367,7 @@ function rmChqRow(c){
     (who ? (" · " + who) : "") + ' · <span class="rm-chq-amt">' + money(c.montant) + "</span></span></label>";
 }
 async function doRemise(){
+  if (!isFondLocked()){ $("rm-err").textContent = "Valide d'abord le fond de caisse du jour."; return; }
   const esp = parseAmt($("rm-esp").value); const e = isNaN(esp) ? 0 : esp;
   const checked = [...$("rm-chq-list").querySelectorAll('input[type="checkbox"]:checked')];
   const cheques = checked.map(cb => {
@@ -365,20 +398,21 @@ function updateCheck(){
   $("ck-cash-total").textContent = money(cash);
   $("ck-cash-theo").textContent = money(t.soldeEspeces);
   setEcartBox($("ck-cash-ecartBox"), $("ck-cash-ecart"), cash - t.soldeEspeces);
+  const chq = sumChqRows("ck");
+  $("ck-chq-total").textContent = money(chq.total);
+  $("ck-chq-nb").textContent = chq.count;
   $("ck-chq-theo").textContent = money(t.soldeCheques);
-  const chq = parseAmt($("ck-chq-total").value);
-  if (isNaN(chq)){ $("ck-chq-ecart").textContent = "—"; $("ck-chq-ecartBox").classList.remove("ok", "ko"); }
-  else setEcartBox($("ck-chq-ecartBox"), $("ck-chq-ecart"), chq - t.soldeCheques);
+  setEcartBox($("ck-chq-ecartBox"), $("ck-chq-ecart"), chq.total - t.soldeCheques);
 }
 function openCheck(){
   if (!ckBuilt){
     buildDenom("ck", $("ck-denom"));
     $("ck-denom").addEventListener("input", updateCheck);
-    $("ck-chq-total").addEventListener("input", updateCheck);
+    wireChqRows("ck", updateCheck);
     ckBuilt = true;
   }
   resetDenom("ck");
-  $("ck-chq-nb").value = ""; $("ck-chq-total").value = "";
+  resetChqRows("ck");
   updateCheck();
   $("checkModal").hidden = false;
 }
@@ -387,19 +421,22 @@ function openCheck(){
 async function doCloture(){
   const esp = parseAmt($("cl-reel").value);
   if (isNaN(esp) || esp < 0){ toast("Saisis le comptage espèces"); $("cl-reel").focus(); return; }
-  const chq = parseAmt($("cl-chq-total").value);
-  const compChq = isNaN(chq) ? 0 : chq;
-  const nb = parseInt($("cl-chq-nb").value, 10) || 0;
+  const chq = sumChqRows("cl");
+  const compChq = chq.total, nb = chq.count;
   const t = computeTotals();
   const ecEsp = esp - t.soldeEspeces, ecChq = compChq - t.soldeCheques;
   if (!window.confirm(
     "Clôturer la journée ?\n" +
     "Espèces — théorique " + num2(t.soldeEspeces) + " · compté " + num2(esp) + " · écart " + num2(ecEsp) + "\n" +
-    "Chèques — théorique " + num2(t.soldeCheques) + " · compté " + num2(compChq) + " · écart " + num2(ecChq) + "\n" +
+    "Chèques — théorique " + num2(t.soldeCheques) + " · compté " + num2(compChq) + " (" + nb + ") · écart " + num2(ecChq) + "\n" +
     "La clôture est définitive.")) return;
   const btn = $("cl-save"), label = btn.textContent;
   btn.disabled = true; btn.textContent = "Clôture…";
-  try { await addCloture({ comptageEspeces: esp, comptageCheques: compChq, nbCheques: nb }); toast("Journée clôturée"); }
+  try {
+    await addCloture({ comptageEspeces: esp, comptageCheques: compChq, nbCheques: nb });
+    resetDenom("cl"); resetChqRows("cl"); $("cl-reel").value = "";
+    toast("Journée clôturée");
+  }
   catch (e) { console.error(e); toast("Clôture impossible (déjà clôturée ?)"); }
   finally { btn.disabled = false; btn.textContent = label; }
 }
@@ -505,6 +542,7 @@ async function doReset(){
   try {
     await resetAll();
     $("fond").value = ""; $("fond").readOnly = false;
+    resetDenom("cl"); resetChqRows("cl"); $("cl-reel").value = "";
     clearForm(false);
     toast("Tout a été réinitialisé");
   } catch (e) {
@@ -532,7 +570,8 @@ function wireUI(){
   buildDenom("cl", $("cl-denom"));
   $("cl-denom").addEventListener("input", () => { $("cl-reel").value = num2(sumDenom("cl")); updateEcart(); });
   $("cl-reel").addEventListener("input", updateEcart);
-  $("cl-chq-total").addEventListener("input", updateEcartChq);
+  resetChqRows("cl");
+  wireChqRows("cl", updateEcartChq);
   $("cl-save").addEventListener("click", doCloture);
 
   $("seg-type").addEventListener("click", ev => {

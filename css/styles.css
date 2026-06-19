@@ -310,3 +310,19 @@ input[readonly]{background:var(--surface); color:var(--muted); cursor:not-allowe
 #btn-reset{flex:1; min-width:150px; font:inherit; cursor:pointer; font-size:14px; font-weight:600;
   color:var(--ret); background:var(--ret-soft); border:1px solid var(--ret); border-radius:11px; padding:11px 14px}
 #btn-reset:hover{filter:brightness(.98)}
+
+/* ===== v6 : comptage chèques ligne par ligne + blocage fond ===== */
+.lock-note{background:var(--out-soft); border:1px solid var(--out); color:#7a4a08; border-radius:11px;
+  padding:10px 13px; font-size:12.5px; margin-bottom:14px; font-weight:600}
+.chq-rows{display:flex; flex-direction:column; gap:8px; margin:2px 0 8px}
+.chq-row{display:grid; grid-template-columns:1fr 1fr 40px; gap:8px; align-items:center}
+.chq-row input{width:100%; font:inherit; font-size:15px; color:var(--ink); border:1.5px solid var(--line);
+  border-radius:10px; padding:11px 11px; background:#fff; min-width:0}
+.chq-row .chq-m{font-family:var(--mono)}
+.chq-row input:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:transparent}
+.chq-del{border:none; background:var(--ret-soft); color:var(--ret); width:40px; height:40px; border-radius:10px;
+  cursor:pointer; font-size:14px; line-height:1; padding:0}
+.chq-del:hover{filter:brightness(.97)}
+.chq-add{font:inherit; cursor:pointer; font-size:13px; font-weight:600; color:var(--ink); background:var(--accent-soft);
+  border:1px dashed var(--line); border-radius:10px; padding:10px 14px}
+.chq-add:hover{filter:brightness(.97)}
