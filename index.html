@@ -70,6 +70,7 @@
     <div class="field-mini">
       <label for="fond">Fond de caisse du jour</label>
       <input id="fond" inputmode="decimal" placeholder="0,00" autocomplete="off">
+      <div class="fond-expected" id="fond-expected" hidden></div>
       <div class="fond-foot">
         <button type="button" id="fond-lock">Enregistrer le fond</button>
         <span class="fond-state" id="fond-state" hidden>🔒 validé · verrouillé</span>
@@ -87,6 +88,7 @@
     <div class="dash-actions">
       <button type="button" id="btn-remise">Remise compta</button>
       <button type="button" id="btn-check">Vérifier la caisse</button>
+      <button type="button" id="btn-suivi" hidden>Suivi des caisses</button>
       <button type="button" id="btn-reset" hidden>Réinitialiser (tout effacer)</button>
     </div>
   </section>
@@ -208,6 +210,8 @@
     <div id="cl-done" class="cl-done" hidden></div>
   </section>
 
+  <footer class="build">AJCV Caisse · v1.9</footer>
+
 </div>
 
 <!-- MODALE REMISE COMPTA -->
@@ -256,6 +260,15 @@
   <div class="modal-card photo-modal">
     <div class="modal-h"><h2>Photo du paiement</h2><button type="button" class="modal-x" id="ph-close" aria-label="Fermer">✕</button></div>
     <div class="photo-view" id="ph-view"></div>
+  </div>
+</div>
+
+<!-- SUIVI DES CAISSES (admin) -->
+<div class="modal-overlay" id="suiviModal" hidden>
+  <div class="modal-card suivi-card">
+    <div class="modal-h"><h2>Suivi des caisses</h2><button type="button" class="modal-x" id="sv-close" aria-label="Fermer">✕</button></div>
+    <p class="suivi-note">Un jour par ligne. Les écarts non nuls (ouverture ou clôture) sont signalés en rouge.</p>
+    <div class="suivi-scroll"><table class="suivi-table" id="suivi-table"><tbody id="suivi-body"></tbody></table></div>
   </div>
 </div>
 

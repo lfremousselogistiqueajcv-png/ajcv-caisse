@@ -19,6 +19,8 @@ alter table public.caisse_clotures add column if not exists ecart_cheque     num
 alter table public.caisse_fonds add column if not exists locked    boolean not null default false;
 alter table public.caisse_fonds add column if not exists locked_at timestamptz;
 alter table public.caisse_fonds add column if not exists locked_by uuid;
+alter table public.caisse_fonds add column if not exists attendu numeric(12,2);
+alter table public.caisse_fonds add column if not exists ecart_ouverture numeric(12,2);
 drop policy if exists fonds_update on public.caisse_fonds;
 create policy fonds_update on public.caisse_fonds
   for update to authenticated using (locked = false) with check (true);

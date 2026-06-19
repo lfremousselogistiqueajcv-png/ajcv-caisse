@@ -6,8 +6,9 @@ import { money, num2, parseAmt, esc, frDate, frTime, todayKey } from "./format.j
 import {
   TYPES, state, useAdapter, onChange, hydrate,
   addEntry, reversal, addRemise, chequesEnCaisse, setOperateur, setRole, isAdmin,
-  computeTotals, getCloture, addCloture, resetAll, unclosedDays,
+  computeTotals, getCloture, addCloture, resetAll, unclosedDays, expectedOpening,
   exportRows, exportFacturesRows, exportAchatsRows, exportRemisesRows, exportCloturesRows,
+  daySummary, allDays, exportSuiviRows,
   persistFond, lockFond, isFondLocked, uploadPhoto, photoUrl
 } from "./state.js";
 import * as prefs from "./prefs.js";
@@ -108,6 +109,10 @@ function renderFond(){
   $("fond-lock").hidden = locked;
   $("fond-state").hidden = !locked;
   $("lockNote").hidden = locked;
+  const exp = expectedOpening();
+  const fe = $("fond-expected");
+  if (!locked && exp != null){ fe.textContent = "Attendu à l'ouverture (dernière clôture) : " + money(exp); fe.hidden = false; }
+  else fe.hidden = true;
 }
 
 // ───────── photo du paiement ─────────
@@ -287,6 +292,7 @@ function applyRoleUI(){
   $("scope").hidden = !admin;
   $("filters").hidden = !admin;
   $("btn-reset").hidden = !admin;
+  $("btn-suivi").hidden = !admin;
   if (!admin){ scope = "day"; typeFilter = "all"; }
 }
 
@@ -484,8 +490,47 @@ async function exportXlsx(){
     const fa = exportFacturesRows(scope); if (fa.length > 1) add(fa, "Ventes");
     const ac = exportAchatsRows(scope); if (ac.length > 1) add(ac, "Achats");
     const re = exportRemisesRows(scope); if (re.length > 1) add(re, "Remises");
+    const sv = exportSuiviRows(); if (sv.length > 1) add(sv, "Suivi");
   }
   XLSX.writeFile(wb, "caisse_AJCV_" + todayKey() + ".xlsx");
+}
+
+function svCell(v, danger){ return "<td" + (danger ? ' class="sv-bad"' : "") + ">" + v + "</td>"; }
+function openSuivi(){
+  const days = allDays();
+  const head = "<tr>" +
+    "<th>Date</th><th>Fond</th><th>Attendu</th><th>Écart ouv.</th>" +
+    "<th>Ventes</th><th>Achats</th><th>Sorties</th><th>Remises</th>" +
+    "<th>Compté esp.</th><th>Écart esp.</th><th>Compté chq</th><th>Écart chq</th><th>Clôture</th>" +
+    "</tr>";
+  let body = "";
+  if (!days.length){
+    body = '<tr><td colspan="13" class="sv-empty">Aucune donnée pour le moment.</td></tr>';
+  } else {
+    days.forEach(k => {
+      const s = daySummary(k), c = s.clot;
+      const ecOuvBad = s.ecartOuv != null && Math.abs(s.ecartOuv) >= 0.005;
+      const ecEspBad = c && Math.abs(c.ecart) >= 0.005;
+      const ecChqBad = c && Math.abs(c.ecartCheque || 0) >= 0.005;
+      body += "<tr>" +
+        '<td class="sv-date">' + esc(s.date) + "</td>" +
+        "<td>" + money(s.fond) + "</td>" +
+        "<td>" + (s.attendu != null ? money(s.attendu) : "—") + "</td>" +
+        svCell(s.ecartOuv != null ? money(s.ecartOuv) : "—", ecOuvBad) +
+        "<td>" + money(s.ventes) + "</td>" +
+        "<td>" + money(s.achats) + "</td>" +
+        "<td>" + money(s.sorties) + "</td>" +
+        "<td>" + money(s.remises) + "</td>" +
+        "<td>" + (c ? money(c.comptage) : "—") + "</td>" +
+        svCell(c ? money(c.ecart) : "—", ecEspBad) +
+        "<td>" + (c ? money(c.comptageCheque || 0) : "—") + "</td>" +
+        svCell(c ? money(c.ecartCheque || 0) : "—", ecChqBad) +
+        "<td>" + (c ? '<span class="sv-ok">clôturé</span>' : '<span class="sv-no">non clôturé</span>') + "</td>" +
+        "</tr>";
+    });
+  }
+  $("suivi-body").innerHTML = head + body;
+  $("suiviModal").hidden = false;
 }
 
 // ───────── toast / horloge ─────────
@@ -585,7 +630,16 @@ async function doFondLock(){
   const n = parseAmt($("fond").value);
   const val = isNaN(n) ? 0 : n;
   state.fonds[todayKey()] = val;
-  if (!window.confirm("Valider le fond de caisse à " + num2(val) + " € ?\nIl sera verrouillé pour la journée et ne pourra plus être modifié.")) return;
+  const exp = expectedOpening();
+  let msg = "Valider le fond de caisse à " + num2(val) + " € ?\nIl sera verrouillé pour la journée et ne pourra plus être modifié.";
+  if (exp != null && Math.abs(val - exp) >= 0.005){
+    msg = "⚠ Le fond ne correspond pas à la dernière clôture.\n\n" +
+      "Attendu (clôture précédente) : " + num2(exp) + " €\n" +
+      "Saisi : " + num2(val) + " €\n" +
+      "Écart : " + num2(val - exp) + " €\n\n" +
+      "Sans remise, un écart peut signaler une erreur ou un vol.\nValider quand même et verrouiller ?";
+  }
+  if (!window.confirm(msg)) return;
   const btn = $("fond-lock"), label = btn.textContent;
   btn.disabled = true; btn.textContent = "…";
   try { await lockFond(); $("fond").value = num2(val); toast("Fond de caisse validé et verrouillé"); }
@@ -662,6 +716,8 @@ function wireUI(){
   });
   $("btn-check").addEventListener("click", openCheck);
   $("ck-close").addEventListener("click", () => { $("checkModal").hidden = true; });
+  $("btn-suivi").addEventListener("click", openSuivi);
+  $("sv-close").addEventListener("click", () => { $("suiviModal").hidden = true; });
   $("ck-done").addEventListener("click", () => { $("checkModal").hidden = true; });
   $("btn-reset").addEventListener("click", doReset);
 

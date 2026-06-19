@@ -331,3 +331,23 @@ input[readonly]{background:var(--surface); color:var(--muted); cursor:not-allowe
 .cloture-alert{background:var(--ret-soft); border:1px solid var(--ret); color:#8a1f33; border-radius:12px;
   padding:11px 14px; font-size:13px; font-weight:600; margin-bottom:14px; animation:rise .3s ease both}
 .cloture-alert[hidden]{display:none}
+
+/* version visible */
+.build{margin-top:22px; text-align:center; font-size:11px; color:var(--muted); letter-spacing:.05em; font-family:var(--mono)}
+
+.fond-expected{font-size:12px; color:var(--brass); font-weight:600; margin-top:6px}
+
+/* ===== v1.9 : panneau Suivi des caisses ===== */
+.suivi-card{max-width:min(96vw,1000px); width:96vw}
+.suivi-note{font-size:12px; color:var(--muted); margin:2px 0 10px}
+.suivi-scroll{overflow:auto; max-height:64vh; -webkit-overflow-scrolling:touch; border:1px solid var(--line); border-radius:10px}
+.suivi-table{border-collapse:collapse; width:100%; font-size:12.5px; font-variant-numeric:tabular-nums}
+.suivi-table th, .suivi-table td{padding:8px 10px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line)}
+.suivi-table th{position:sticky; top:0; background:var(--ink); color:#fff; font-weight:600; font-size:11.5px; z-index:1}
+.suivi-table th:first-child, .suivi-table td:first-child{text-align:left}
+.suivi-table tr:last-child td{border-bottom:none}
+.suivi-table .sv-date{font-weight:700; color:var(--ink)}
+.suivi-table .sv-bad{color:var(--ret); font-weight:700; background:var(--ret-soft)}
+.sv-ok{color:var(--in); font-weight:600}
+.sv-no{color:var(--out); font-weight:600}
+.sv-empty{text-align:center !important; color:var(--muted); padding:24px 10px !important}

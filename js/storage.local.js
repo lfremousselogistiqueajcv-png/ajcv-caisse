@@ -9,7 +9,7 @@
 const KEY = "ajcv_caisse_v3";
 
 export function createLocalStore(){
-  let data = { entries: [], fonds: {}, fondsLocked: {}, clotures: {}, counter: 0 };
+  let data = { entries: [], fonds: {}, fondsLocked: {}, fondsMeta: {}, clotures: {}, counter: 0 };
   let mem = false;
 
   try {
@@ -19,6 +19,7 @@ export function createLocalStore(){
       data.entries = d.entries || [];
       data.fonds = d.fonds || {};
       data.fondsLocked = d.fondsLocked || {};
+      data.fondsMeta = d.fondsMeta || {};
       data.clotures = d.clotures || {};
       data.counter = d.counter || data.entries.reduce((m, e) => Math.max(m, e.seq || 0), 0);
     }
@@ -38,7 +39,8 @@ export function createLocalStore(){
       return {
         entries: data.entries.slice(),
         fonds: Object.assign({}, data.fonds),
-        fondsLocked: Object.assign({}, data.fondsLocked)
+        fondsLocked: Object.assign({}, data.fondsLocked),
+        fondsMeta: Object.assign({}, data.fondsMeta)
       };
     },
 
@@ -51,9 +53,12 @@ export function createLocalStore(){
       return entry;
     },
 
-    async setFond(dateKey, val, lock){
+    async setFond(dateKey, val, lock, attendu, ecart){
       data.fonds[dateKey] = val;
-      if (lock) data.fondsLocked[dateKey] = true;
+      if (lock){
+        data.fondsLocked[dateKey] = true;
+        data.fondsMeta[dateKey] = { attendu: (attendu != null ? attendu : null), ecart: (ecart != null ? ecart : null) };
+      }
       persist();
     },
 
@@ -72,7 +77,7 @@ export function createLocalStore(){
     },
 
     async reset(){
-      data = { entries: [], fonds: {}, fondsLocked: {}, clotures: {}, counter: 0 };
+      data = { entries: [], fonds: {}, fondsLocked: {}, fondsMeta: {}, clotures: {}, counter: 0 };
       persist();
     }
   };

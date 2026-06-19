@@ -13,7 +13,7 @@ export const TYPES = {
 };
 export const MODES = ["Espèces", "Chèque", "CB"];
 
-export const state = { operateur: "", role: "local", fonds: {}, fondsLocked: {}, entries: [], clotures: {} };
+export const state = { operateur: "", role: "local", fonds: {}, fondsLocked: {}, fondsMeta: {}, entries: [], clotures: {} };
 
 let adapter = null;
 const listeners = [];
@@ -27,6 +27,7 @@ export async function hydrate(){
   state.entries = d.entries || [];
   state.fonds = d.fonds || {};
   state.fondsLocked = d.fondsLocked || {};
+  state.fondsMeta = d.fondsMeta || {};
   if (adapter.listClotures){
     state.clotures = await adapter.listClotures();
   }
@@ -103,7 +104,7 @@ export function isAdmin(){ return state.role === "admin" || state.role === "loca
 // En Supabase, l'effacement passe par une fonction serveur qui vérifie le rôle admin.
 export async function resetAll(){
   if (adapter && adapter.reset) await adapter.reset();
-  state.entries = []; state.fonds = {}; state.fondsLocked = {}; state.clotures = {};
+  state.entries = []; state.fonds = {}; state.fondsLocked = {}; state.fondsMeta = {}; state.clotures = {};
   emit();
 }
 
@@ -124,8 +125,12 @@ export async function persistFond(key){
 export function isFondLocked(key){ key = key || todayKey(); return !!state.fondsLocked[key]; }
 export async function lockFond(key){
   key = key || todayKey();
-  if (adapter) await adapter.setFond(key, state.fonds[key] || 0, true);
+  const val = state.fonds[key] || 0;
+  const attendu = expectedOpening();
+  const ecart = (attendu == null) ? null : Math.round((val - attendu) * 100) / 100;
+  if (adapter) await adapter.setFond(key, val, true, attendu, ecart);
   state.fondsLocked[key] = true;
+  state.fondsMeta[key] = { attendu: attendu, ecart: ecart };
   emit();
 }
 
@@ -151,6 +156,16 @@ export function computeTotals(key){
 
 // ---------- clôture quotidienne ----------
 export function getCloture(key){ key = key || todayKey(); return state.clotures[key] || null; }
+
+// Montant d'espèces attendu à l'ouverture = comptage de la dernière clôture
+// (avant aujourd'hui). null s'il n'y a pas encore eu de clôture.
+export function expectedOpening(){
+  const today = todayKey();
+  const keys = Object.keys(state.clotures).filter(k => k < today).sort();
+  if (!keys.length) return null;
+  const last = state.clotures[keys[keys.length - 1]];
+  return last && last.comptage != null ? last.comptage : null;
+}
 
 // Jours passés (avant aujourd'hui) qui ont des opérations mais pas de clôture.
 export function unclosedDays(){
@@ -255,6 +270,57 @@ export function exportCloturesRows(scope){
       c.date, num2(c.fond), num2(c.theorique), num2(c.comptage), num2(c.ecart),
       num2(c.theoriqueCheque || 0), num2(c.comptageCheque || 0), c.nbCheque || 0, num2(c.ecartCheque || 0),
       c.operateur || "", dt ? (frDate(dt) + " " + frTime(dt)) : ""
+    ]);
+  });
+  return rows;
+}
+
+// ---------- suivi journalier (traçabilité / anti-vol) ----------
+// Agrège tout ce qui est enregistré pour un jour donné.
+export function daySummary(key){
+  let ventes = 0, achats = 0, sorties = 0, remises = 0, retours = 0, nb = 0;
+  state.entries.forEach(e => {
+    if (e.dateKey !== key) return; nb++;
+    if (e.typeKey === "facture") ventes += e.montant;
+    else if (e.typeKey === "achat") achats += e.montant;
+    else if (e.typeKey === "sortie") sorties += e.montant;
+    else if (e.typeKey === "remise") remises += e.montant;
+    else if (e.typeKey === "retour") retours += e.montant;
+  });
+  const meta = state.fondsMeta[key] || {};
+  const c = state.clotures[key] || null;
+  return {
+    dateKey: key, date: frDate(new Date(key + "T00:00:00")),
+    fond: state.fonds[key] || 0, locked: !!state.fondsLocked[key],
+    attendu: (meta.attendu != null) ? meta.attendu : null,
+    ecartOuv: (meta.ecart != null) ? meta.ecart : null,
+    ventes, achats, sorties, remises, retours, nb, clot: c
+  };
+}
+// Tous les jours connus (opérations, clôtures ou fonds), récents d'abord.
+export function allDays(){
+  const s = new Set();
+  state.entries.forEach(e => { if (e.dateKey) s.add(e.dateKey); });
+  Object.keys(state.clotures).forEach(k => s.add(k));
+  Object.keys(state.fonds).forEach(k => s.add(k));
+  return [...s].filter(Boolean).sort().reverse();
+}
+export function exportSuiviRows(){
+  const rows = [[
+    "Date", "Fond ouverture", "Attendu ouverture", "Écart ouverture",
+    "Ventes", "Achats", "Sorties", "Remises", "Nb opérations",
+    "Comptage espèces", "Écart espèces", "Comptage chèques", "Écart chèques", "Clôturé par"
+  ]];
+  allDays().slice().reverse().forEach(k => {
+    const s = daySummary(k); const c = s.clot;
+    rows.push([
+      s.date, num2(s.fond),
+      s.attendu != null ? num2(s.attendu) : "",
+      s.ecartOuv != null ? num2(s.ecartOuv) : "",
+      num2(s.ventes), num2(s.achats), num2(s.sorties), num2(s.remises), s.nb,
+      c ? num2(c.comptage) : "", c ? num2(c.ecart) : "",
+      c ? num2(c.comptageCheque || 0) : "", c ? num2(c.ecartCheque || 0) : "",
+      c ? (c.operateur || "") : "(non clôturé)"
     ]);
   });
   return rows;

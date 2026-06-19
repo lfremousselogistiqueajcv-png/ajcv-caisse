@@ -48,9 +48,17 @@ export function createSupabaseStore(sb){
       if (error) throw error;
       const { data: fo, error: fe } = await sb.from("caisse_fonds").select("*");
       if (fe) throw fe;
-      const fonds = {}, fondsLocked = {};
-      (fo || []).forEach(f => { fonds[f.op_date] = Number(f.montant); if (f.locked) fondsLocked[f.op_date] = true; });
-      return { entries: (ops || []).map(fromRow), fonds, fondsLocked };
+      const fonds = {}, fondsLocked = {}, fondsMeta = {};
+      (fo || []).forEach(f => {
+        fonds[f.op_date] = Number(f.montant);
+        if (f.locked) fondsLocked[f.op_date] = true;
+        if (f.attendu != null || f.ecart_ouverture != null)
+          fondsMeta[f.op_date] = {
+            attendu: f.attendu != null ? Number(f.attendu) : null,
+            ecart: f.ecart_ouverture != null ? Number(f.ecart_ouverture) : null
+          };
+      });
+      return { entries: (ops || []).map(fromRow), fonds, fondsLocked, fondsMeta };
     },
 
     async create(entry){
@@ -60,9 +68,13 @@ export function createSupabaseStore(sb){
       return fromRow(data);
     },
 
-    async setFond(dateKey, val, lock){
+    async setFond(dateKey, val, lock, attendu, ecart){
       const row = { op_date: dateKey, montant: val, locked: !!lock };
-      if (lock) row.locked_at = new Date().toISOString();
+      if (lock){
+        row.locked_at = new Date().toISOString();
+        if (attendu != null) row.attendu = attendu;
+        if (ecart != null) row.ecart_ouverture = ecart;
+      }
       const { error } = await sb
         .from("caisse_fonds")
         .upsert(row, { onConflict: "op_date" });

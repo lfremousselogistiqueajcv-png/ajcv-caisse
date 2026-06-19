@@ -75,6 +75,8 @@ create table if not exists public.caisse_fonds (
   locked     boolean not null default false,
   locked_at  timestamptz,
   locked_by  uuid,
+  attendu          numeric(12,2),
+  ecart_ouverture  numeric(12,2),
   updated_at timestamptz not null default now()
 );
 
