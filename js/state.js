@@ -305,6 +305,27 @@ export function allDays(){
   Object.keys(state.fonds).forEach(k => s.add(k));
   return [...s].filter(Boolean).sort().reverse();
 }
+// Données complètes pour le rapport de clôture (ticket Z) d'un jour.
+export function dayReport(key){
+  key = key || todayKey();
+  const s = daySummary(key);
+  const t = computeTotals(key);
+  let vEsp = 0, vChq = 0, vCb = 0, cbIn = 0;
+  state.entries.forEach(e => {
+    if (e.dateKey !== key) return;
+    if (e.typeKey === "facture"){
+      if (e.mode === "Espèces") vEsp += e.montant;
+      else if (e.mode === "Chèque") vChq += e.montant;
+      else if (e.mode === "CB") vCb += e.montant;
+    }
+    if (e.mode === "CB" && e.sens > 0) cbIn += e.montant;
+  });
+  return Object.assign({}, s, {
+    theoEsp: t.soldeEspeces, theoChq: t.soldeCheques,
+    espIn: t.espIn, espOut: t.espOut, chqIn: t.chqIn, chqOut: t.chqOut,
+    ventesEsp: vEsp, ventesChq: vChq, ventesCb: vCb, cbIn: cbIn
+  });
+}
 export function exportSuiviRows(){
   const rows = [[
     "Date", "Fond ouverture", "Attendu ouverture", "Écart ouverture",

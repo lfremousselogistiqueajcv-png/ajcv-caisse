@@ -8,7 +8,7 @@ import {
   addEntry, reversal, addRemise, chequesEnCaisse, setOperateur, setRole, isAdmin,
   computeTotals, getCloture, addCloture, resetAll, unclosedDays, expectedOpening,
   exportRows, exportFacturesRows, exportAchatsRows, exportRemisesRows, exportCloturesRows,
-  daySummary, allDays, exportSuiviRows,
+  daySummary, allDays, exportSuiviRows, dayReport,
   persistFond, lockFond, isFondLocked, uploadPhoto, photoUrl
 } from "./state.js";
 import * as prefs from "./prefs.js";
@@ -266,7 +266,8 @@ function renderCloture(){
       '<div class="row"><span>Comptage chèques</span><b>' + money(c.comptageCheque || 0) + " (" + (c.nbCheque || 0) + ")</b></div>" +
       '<div class="row"><span>Écart chèques</span><b>' + signMoney(c.ecartCheque || 0) + "</b></div>" +
       '<div class="row"><span>Clôturé par</span><b>' + esc(c.operateur || "—") + "</b></div>" +
-      (dt ? '<div class="row"><span>Le</span><b>' + frDate(dt) + " " + frTime(dt) + "</b></div>" : "");
+      (dt ? '<div class="row"><span>Le</span><b>' + frDate(dt) + " " + frTime(dt) + "</b></div>" : "") +
+      '<button type="button" class="z-open-btn" id="cl-z">Voir le rapport Z</button>';
   } else {
     $("cl-form").hidden = false;
     $("cl-done").hidden = true;
@@ -293,6 +294,7 @@ function applyRoleUI(){
   $("filters").hidden = !admin;
   $("btn-reset").hidden = !admin;
   $("btn-suivi").hidden = !admin;
+  $("btn-param").hidden = !(admin && sb);
   if (!admin){ scope = "day"; typeFilter = "all"; }
 }
 
@@ -324,6 +326,17 @@ async function doSave(){
   if (!isFondLocked()){ $("err").textContent = "Valide d'abord le fond de caisse du jour (bouton « Enregistrer le fond »)."; return; }
   const msg = validate();
   if (msg){ $("err").textContent = msg; return; }
+  // confirmation avant enregistrement
+  const amount = parseAmt($("montant").value);
+  const ndoc = $("ndoc").value.trim();
+  const who = ($("nom").value.trim() + " " + $("prenom").value.trim()).trim();
+  const recap = "Enregistrer cette opération ?\n\n" +
+    TYPES[form.type].label + " · " + num2(amount) + " €\n" +
+    "Règlement : " + form.mode +
+      (form.mode === "Chèque" && $("nchq").value.trim() ? (" n° " + $("nchq").value.trim()) : "") + "\n" +
+    (ndoc ? ("Pièce : " + ndoc + "\n") : "") +
+    (who ? ("Client : " + who) : "");
+  if (!window.confirm(recap)) return;
   const btn = $("save"), label = btn.textContent;
   btn.disabled = true; btn.textContent = "Enregistrement…";
   try {
@@ -395,8 +408,15 @@ async function doRemise(){
   });
   if (e <= 0 && !cheques.length){ $("rm-err").textContent = "Indique des espèces et/ou coche des chèques."; return; }
   const t = computeTotals();
-  if (e > t.soldeEspeces + 0.005 &&
-      !window.confirm("Tu remets " + num2(e) + " € d'espèces alors que la caisse en contient " + num2(t.soldeEspeces) + " €.\nContinuer ?")) return;
+  const totalChq = cheques.reduce((s, c) => s + c.montant, 0);
+  let recap = "Enregistrer cette remise à la compta ?\n\n" +
+    "Espèces : " + num2(e) + " €\n" +
+    "Chèques : " + num2(totalChq) + " € (" + cheques.length + ")\n" +
+    "Total remis : " + num2(e + totalChq) + " €";
+  if (e > t.soldeEspeces + 0.005){
+    recap += "\n\n⚠ Tu remets plus d'espèces que la caisse n'en contient (" + num2(t.soldeEspeces) + " €).";
+  }
+  if (!window.confirm(recap)) return;
   const btn = $("rm-save"), label = btn.textContent;
   btn.disabled = true; btn.textContent = "…";
   try { await addRemise(e, cheques); $("remiseModal").hidden = true; toast("Remise enregistrée"); }
@@ -496,16 +516,158 @@ async function exportXlsx(){
 }
 
 function svCell(v, danger){ return "<td" + (danger ? ' class="sv-bad"' : "") + ">" + v + "</td>"; }
+
+function zLine(label, val, opts){
+  const cls = (opts && opts.bad) ? ' class="z-bad"' : "";
+  return '<div class="z-row"' + cls + "><span>" + label + "</span><b>" + val + "</b></div>";
+}
+function buildZHTML(key){
+  const r = dayReport(key), c = r.clot, now = new Date();
+  const ecOuvBad = r.ecartOuv != null && Math.abs(r.ecartOuv) >= 0.005;
+  const ecEspBad = c && Math.abs(c.ecart) >= 0.005;
+  const ecChqBad = c && Math.abs(c.ecartCheque || 0) >= 0.005;
+  let h = "";
+  h += '<div class="z-head"><div class="z-title">AJCV — Rapport de caisse (Z)</div>' +
+       '<div class="z-sub">' + esc(r.date) + "</div>" +
+       '<div class="z-meta">' + (c ? ("Clôturé par " + esc(c.operateur || "—")) : "Journée non clôturée") +
+       " · édité le " + frDate(now) + " " + frTime(now) + "</div></div>";
+  h += '<div class="z-sec"><div class="z-sec-t">Ouverture</div>';
+  h += zLine("Fond de caisse", money(r.fond));
+  if (r.attendu != null) h += zLine("Attendu (clôture précédente)", money(r.attendu));
+  if (r.ecartOuv != null) h += zLine("Écart d’ouverture", signMoney(r.ecartOuv), { bad: ecOuvBad });
+  h += "</div>";
+  h += '<div class="z-sec"><div class="z-sec-t">Mouvements du jour</div>';
+  h += zLine("Ventes (factures)", money(r.ventes));
+  h += '<div class="z-detail">' + zLine("· espèces", money(r.ventesEsp)) +
+       zLine("· chèques", money(r.ventesChq)) + zLine("· CB", money(r.ventesCb)) + "</div>";
+  if (r.achats) h += zLine("Achats payés", money(r.achats));
+  if (r.sorties) h += zLine("Sorties d’espèces", money(r.sorties));
+  if (r.retours) h += zLine("Retours / remboursements", money(r.retours));
+  if (r.remises) h += zLine("Remises à la compta", money(r.remises));
+  h += zLine("Nombre d’opérations", String(r.nb)) + "</div>";
+  h += '<div class="z-sec"><div class="z-sec-t">Espèces</div>';
+  h += zLine("Théorique en caisse", money(r.theoEsp));
+  if (c){ h += zLine("Compté", money(c.comptage)); h += zLine("Écart espèces", signMoney(c.ecart), { bad: ecEspBad }); }
+  else h += '<div class="z-row z-muted"><span>Comptage</span><b>— non clôturé —</b></div>';
+  h += "</div>";
+  h += '<div class="z-sec"><div class="z-sec-t">Chèques</div>';
+  h += zLine("Théorique en caisse", money(r.theoChq));
+  if (c){ h += zLine("Compté (" + (c.nbCheque || 0) + ")", money(c.comptageCheque || 0)); h += zLine("Écart chèques", signMoney(c.ecartCheque || 0), { bad: ecChqBad }); }
+  else h += '<div class="z-row z-muted"><span>Comptage</span><b>— non clôturé —</b></div>';
+  h += "</div>";
+  if (r.cbIn) h += '<div class="z-sec"><div class="z-sec-t">CB (information)</div>' + zLine("Encaissé CB", money(r.cbIn)) + "</div>";
+  h += '<div class="z-sign"><div>Signature responsable</div><div class="z-sign-line"></div></div>';
+  return h;
+}
+function openZ(key){ $("z-body").innerHTML = buildZHTML(key); $("zModal").hidden = false; }
+function printZ(){ $("zPrint").innerHTML = $("z-body").innerHTML; window.print(); }
+
+// ───────── Paramètres : utilisateurs (admin, via la fonction serveur) ─────────
+function pmMsg(text, bad){
+  const el = $("pm-msg");
+  if (!text){ el.hidden = true; el.textContent = ""; el.className = "pm-msg"; return; }
+  el.textContent = text; el.hidden = false; el.className = "pm-msg" + (bad ? " bad" : " ok");
+}
+function genPwd(){
+  const cs = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const a = new Uint32Array(12); crypto.getRandomValues(a);
+  let s = ""; for (let i = 0; i < 12; i++) s += cs[a[i] % cs.length];
+  return s;
+}
+async function adminCall(action, payload){
+  if (!sb) throw new Error("Disponible uniquement en ligne");
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session && session.access_token;
+  if (!token) throw new Error("Session expirée, reconnecte-toi");
+  const url = CONFIG.SUPABASE_URL.replace(/\/+$/, "") + "/functions/v1/admin-users";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": CONFIG.SUPABASE_ANON_KEY, "Authorization": "Bearer " + token },
+    body: JSON.stringify(Object.assign({ action }, payload || {}))
+  });
+  let j = {}; try { j = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error(j.error || ("Erreur " + res.status));
+  return j;
+}
+function roleBadge(role){ return '<span class="pm-role ' + (role === "admin" ? "adm" : "cai") + '">' + (role === "admin" ? "Admin" : "Caissier") + "</span>"; }
+function renderUsers(users){
+  if (!users || !users.length){ $("pm-list").innerHTML = '<div class="pm-loading">Aucun utilisateur.</div>'; return; }
+  $("pm-list").innerHTML = users.map(u => {
+    const last = u.last_sign_in_at ? frDate(new Date(u.last_sign_in_at)) : "jamais";
+    return '<div class="pm-u" data-id="' + u.id + '" data-email="' + esc(u.email) + '" data-role="' + u.role + '">' +
+      '<div class="pm-u-top"><b>' + esc(u.display_name || u.email.split("@")[0]) + "</b>" + roleBadge(u.role) + "</div>" +
+      '<div class="pm-u-mail">' + esc(u.email) + "</div>" +
+      '<div class="pm-u-meta">Dernière connexion : ' + last + "</div>" +
+      '<div class="pm-u-act">' +
+        '<button type="button" class="pm-b" data-act="role">' + (u.role === "admin" ? "Passer caissier" : "Passer admin") + "</button>" +
+        '<button type="button" class="pm-b" data-act="pwd">Mot de passe</button>' +
+        '<button type="button" class="pm-b" data-act="mail">Mail reset</button>' +
+        '<button type="button" class="pm-b danger" data-act="del">Supprimer</button>' +
+      "</div></div>";
+  }).join("");
+}
+async function loadUsers(){
+  $("pm-list").innerHTML = '<div class="pm-loading">Chargement…</div>';
+  try { const r = await adminCall("list"); renderUsers(r.users); }
+  catch (e) { $("pm-list").innerHTML = '<div class="pm-loading">Erreur : ' + esc(e.message) + "</div>"; }
+}
+async function openParam(){
+  pmMsg("");
+  $("pm-email").value = ""; $("pm-name").value = ""; $("pm-role").value = "caissier"; $("pm-pwd").value = genPwd();
+  $("paramModal").hidden = false;
+  await loadUsers();
+}
+async function doCreateUser(){
+  const email = $("pm-email").value.trim();
+  const password = $("pm-pwd").value.trim();
+  const display_name = $("pm-name").value.trim();
+  const role = $("pm-role").value;
+  if (!email || !password){ pmMsg("Email et mot de passe requis", true); return; }
+  const btn = $("pm-create"), label = btn.textContent; btn.disabled = true; btn.textContent = "Création…";
+  try {
+    await adminCall("create", { email, password, display_name, role });
+    pmMsg("Compte créé : " + email + " · mot de passe : " + password);
+    $("pm-email").value = ""; $("pm-name").value = ""; $("pm-pwd").value = genPwd();
+    await loadUsers();
+  } catch (e) { pmMsg(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+async function userAction(act, card){
+  const id = card.dataset.id, email = card.dataset.email, role = card.dataset.role;
+  try {
+    if (act === "role"){
+      const next = role === "admin" ? "caissier" : "admin";
+      if (!window.confirm("Changer le rôle de " + email + " en « " + next + " » ?")) return;
+      await adminCall("setRole", { user_id: id, role: next });
+      pmMsg("Rôle mis à jour : " + email + " → " + next);
+    } else if (act === "pwd"){
+      const np = window.prompt("Nouveau mot de passe temporaire pour " + email + " :", genPwd());
+      if (!np) return;
+      await adminCall("setPassword", { user_id: id, password: np.trim() });
+      pmMsg("Mot de passe réinitialisé pour " + email + " : " + np.trim());
+    } else if (act === "mail"){
+      if (!window.confirm("Envoyer un mail de réinitialisation à " + email + " ?")) return;
+      await adminCall("resetEmail", { email, redirect_to: location.origin + location.pathname });
+      pmMsg("Mail de réinitialisation envoyé à " + email);
+    } else if (act === "del"){
+      if (!window.confirm("Supprimer définitivement le compte " + email + " ?\nCette action est irréversible.")) return;
+      await adminCall("delete", { user_id: id });
+      pmMsg("Compte supprimé : " + email);
+    }
+    await loadUsers();
+  } catch (e) { pmMsg(e.message, true); }
+}
+
 function openSuivi(){
   const days = allDays();
   const head = "<tr>" +
     "<th>Date</th><th>Fond</th><th>Attendu</th><th>Écart ouv.</th>" +
     "<th>Ventes</th><th>Achats</th><th>Sorties</th><th>Remises</th>" +
-    "<th>Compté esp.</th><th>Écart esp.</th><th>Compté chq</th><th>Écart chq</th><th>Clôture</th>" +
+    "<th>Compté esp.</th><th>Écart esp.</th><th>Compté chq</th><th>Écart chq</th><th>Clôture</th><th>Z</th>" +
     "</tr>";
   let body = "";
   if (!days.length){
-    body = '<tr><td colspan="13" class="sv-empty">Aucune donnée pour le moment.</td></tr>';
+    body = '<tr><td colspan="14" class="sv-empty">Aucune donnée pour le moment.</td></tr>';
   } else {
     days.forEach(k => {
       const s = daySummary(k), c = s.clot;
@@ -526,6 +688,7 @@ function openSuivi(){
         "<td>" + (c ? money(c.comptageCheque || 0) : "—") + "</td>" +
         svCell(c ? money(c.ecartCheque || 0) : "—", ecChqBad) +
         "<td>" + (c ? '<span class="sv-ok">clôturé</span>' : '<span class="sv-no">non clôturé</span>') + "</td>" +
+        '<td class="sv-z"><button type="button" class="sv-zbtn" data-key="' + k + '">Z</button></td>' +
         "</tr>";
     });
   }
@@ -718,6 +881,18 @@ function wireUI(){
   $("ck-close").addEventListener("click", () => { $("checkModal").hidden = true; });
   $("btn-suivi").addEventListener("click", openSuivi);
   $("sv-close").addEventListener("click", () => { $("suiviModal").hidden = true; });
+  $("suivi-body").addEventListener("click", ev => { const b = ev.target.closest(".sv-zbtn"); if (b) openZ(b.dataset.key); });
+  $("z-close").addEventListener("click", () => { $("zModal").hidden = true; });
+  $("z-print-btn").addEventListener("click", printZ);
+  $("cl-done").addEventListener("click", ev => { if (ev.target.closest("#cl-z")) openZ(todayKey()); });
+  $("btn-param").addEventListener("click", openParam);
+  $("pm-close").addEventListener("click", () => { $("paramModal").hidden = true; });
+  $("pm-gen").addEventListener("click", () => { $("pm-pwd").value = genPwd(); });
+  $("pm-create").addEventListener("click", doCreateUser);
+  $("pm-list").addEventListener("click", ev => {
+    const b = ev.target.closest(".pm-b"); if (!b) return;
+    const card = b.closest(".pm-u"); if (card) userAction(b.dataset.act, card);
+  });
   $("ck-done").addEventListener("click", () => { $("checkModal").hidden = true; });
   $("btn-reset").addEventListener("click", doReset);
 

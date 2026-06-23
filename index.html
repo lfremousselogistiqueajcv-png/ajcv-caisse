@@ -89,6 +89,7 @@
       <button type="button" id="btn-remise">Remise compta</button>
       <button type="button" id="btn-check">Vérifier la caisse</button>
       <button type="button" id="btn-suivi" hidden>Suivi des caisses</button>
+      <button type="button" id="btn-param" hidden>Paramètres</button>
       <button type="button" id="btn-reset" hidden>Réinitialiser (tout effacer)</button>
     </div>
   </section>
@@ -210,7 +211,7 @@
     <div id="cl-done" class="cl-done" hidden></div>
   </section>
 
-  <footer class="build">AJCV Caisse · v1.9</footer>
+  <footer class="build">AJCV Caisse · v2.2</footer>
 
 </div>
 
@@ -271,6 +272,37 @@
     <div class="suivi-scroll"><table class="suivi-table" id="suivi-table"><tbody id="suivi-body"></tbody></table></div>
   </div>
 </div>
+
+<!-- PARAMÈTRES — GESTION DES UTILISATEURS (admin) -->
+<div class="modal-overlay" id="paramModal" hidden>
+  <div class="modal-card param-card">
+    <div class="modal-h"><h2>Paramètres — utilisateurs</h2><button type="button" class="modal-x" id="pm-close" aria-label="Fermer">✕</button></div>
+    <div class="pm-msg" id="pm-msg" hidden></div>
+    <div class="pm-list" id="pm-list"><div class="pm-loading">Chargement…</div></div>
+    <div class="pm-create">
+      <div class="pm-create-t">Créer un utilisateur</div>
+      <input id="pm-email" type="email" inputmode="email" placeholder="Email" autocomplete="off">
+      <input id="pm-name" placeholder="Nom affiché" autocomplete="off">
+      <div class="pm-row2">
+        <select id="pm-role"><option value="caissier">Caissier</option><option value="admin">Admin</option></select>
+        <div class="pm-pwd-wrap"><input id="pm-pwd" placeholder="Mot de passe temporaire" autocomplete="off"><button type="button" id="pm-gen" class="pm-gen">Générer</button></div>
+      </div>
+      <button type="button" class="save" id="pm-create">Créer le compte</button>
+    </div>
+  </div>
+</div>
+
+<!-- RAPPORT DE CAISSE (Z) -->
+<div class="modal-overlay" id="zModal" hidden>
+  <div class="modal-card z-card">
+    <div class="modal-h"><h2>Rapport de caisse (Z)</h2><button type="button" class="modal-x" id="z-close" aria-label="Fermer">✕</button></div>
+    <div class="z-body" id="z-body"></div>
+    <button type="button" class="save" id="z-print-btn">Imprimer / PDF</button>
+  </div>
+</div>
+
+<!-- zone imprimée (cachée à l'écran) -->
+<div id="zPrint" class="z-print"></div>
 
 <div class="toast" id="toast"></div>
 

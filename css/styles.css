@@ -351,3 +351,69 @@ input[readonly]{background:var(--surface); color:var(--muted); cursor:not-allowe
 .sv-ok{color:var(--in); font-weight:600}
 .sv-no{color:var(--out); font-weight:600}
 .sv-empty{text-align:center !important; color:var(--muted); padding:24px 10px !important}
+
+/* ===== v2.0 : rapport de caisse (Z) imprimable ===== */
+.z-card{max-width:min(94vw,560px)}
+.z-body{margin:4px 0 14px}
+.z-head{text-align:center; padding-bottom:12px; margin-bottom:6px; border-bottom:2px solid var(--ink)}
+.z-title{font-weight:800; font-size:16px; color:var(--ink); letter-spacing:.02em}
+.z-sub{font-weight:700; margin-top:3px; color:var(--ink)}
+.z-meta{font-size:11.5px; color:var(--muted); margin-top:4px}
+.z-sec{margin:12px 0}
+.z-sec-t{font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--brass); font-weight:700; margin-bottom:5px; border-bottom:1px solid var(--line); padding-bottom:3px}
+.z-row{display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:4px 0; font-size:13.5px}
+.z-row span{color:var(--ink-soft)}
+.z-row b{font-family:var(--mono); color:var(--ink); white-space:nowrap}
+.z-detail{margin:2px 0 2px 12px}
+.z-detail .z-row{padding:2px 0; font-size:12.5px}
+.z-row.z-bad b{color:var(--ret)}
+.z-row.z-muted b{color:var(--muted); font-family:var(--sans); font-style:italic}
+.z-sign{margin-top:18px; padding-top:8px}
+.z-sign>div:first-child{font-size:11px; color:var(--muted)}
+.z-sign-line{height:34px; border:1px solid var(--line); border-radius:8px; margin-top:4px}
+.z-open-btn{margin-top:12px; width:100%; padding:11px; border:1px solid var(--ink); background:#fff; color:var(--ink); border-radius:10px; font:inherit; font-weight:600; cursor:pointer}
+.z-open-btn:hover{background:var(--ink); color:#fff}
+.sv-z{text-align:center !important}
+.sv-zbtn{border:1px solid var(--ink); background:#fff; color:var(--ink); border-radius:8px; padding:5px 11px; font:inherit; font-size:12px; font-weight:700; cursor:pointer}
+.sv-zbtn:hover{background:var(--ink); color:#fff}
+
+/* impression : on n'imprime que #zPrint */
+.z-print{display:none}
+@media print {
+  body{background:#fff !important}
+  body > *:not(#zPrint){display:none !important}
+  #zPrint{display:block !important; padding:0; color:#000}
+  #zPrint .z-head{border-color:#000}
+  #zPrint .z-title, #zPrint .z-sub, #zPrint .z-row b{color:#000}
+  #zPrint .z-sec-t{color:#000; border-color:#999}
+  #zPrint .z-row.z-bad b{color:#000; font-weight:800; text-decoration:underline}
+  #zPrint .z-row span{color:#333}
+  #zPrint .z-sign-line{border-color:#000}
+}
+
+/* ===== v2.1 : Paramètres — gestion des utilisateurs ===== */
+.param-card{max-width:min(94vw,560px)}
+.pm-msg{border-radius:10px; padding:10px 12px; font-size:12.5px; font-weight:600; margin-bottom:12px; word-break:break-word}
+.pm-msg.ok{background:var(--in-soft); color:var(--in); border:1px solid var(--in)}
+.pm-msg.bad{background:var(--ret-soft); color:var(--ret); border:1px solid var(--ret)}
+.pm-list{display:flex; flex-direction:column; gap:10px; margin-bottom:16px}
+.pm-loading{color:var(--muted); font-size:13px; padding:8px 2px}
+.pm-u{border:1px solid var(--line); border-radius:12px; padding:11px 12px; background:var(--surface)}
+.pm-u-top{display:flex; align-items:center; gap:8px; justify-content:space-between}
+.pm-u-top b{color:var(--ink); font-size:14px}
+.pm-role{font-size:11px; font-weight:700; padding:2px 9px; border-radius:999px; white-space:nowrap}
+.pm-role.adm{background:var(--brass-soft); color:var(--brass)}
+.pm-role.cai{background:var(--accent-soft); color:var(--accent)}
+.pm-u-mail{font-size:12.5px; color:var(--ink-soft); margin-top:3px; word-break:break-all}
+.pm-u-meta{font-size:11px; color:var(--muted); margin-top:2px}
+.pm-u-act{display:flex; flex-wrap:wrap; gap:6px; margin-top:9px}
+.pm-b{font:inherit; font-size:12px; font-weight:600; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer}
+.pm-b:hover{filter:brightness(.97)}
+.pm-b.danger{border-color:var(--ret); color:var(--ret); background:var(--ret-soft)}
+.pm-create{border-top:1px solid var(--line); padding-top:14px}
+.pm-create-t{font-weight:700; color:var(--ink); margin-bottom:10px}
+.pm-create input, .pm-create select{width:100%; font:inherit; font-size:15px; color:var(--ink); border:1.5px solid var(--line); border-radius:10px; padding:11px; background:#fff; margin-bottom:9px}
+.pm-row2{display:grid; grid-template-columns:1fr 1.4fr; gap:9px}
+.pm-pwd-wrap{display:flex; gap:6px}
+.pm-pwd-wrap input{margin-bottom:0}
+.pm-gen{flex:none; font:inherit; font-size:12px; font-weight:600; padding:0 12px; border-radius:10px; border:1px solid var(--line); background:var(--accent-soft); color:var(--ink); cursor:pointer}
