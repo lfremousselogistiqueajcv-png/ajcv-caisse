@@ -15,7 +15,7 @@ import * as prefs from "./prefs.js";
 import * as auth from "./auth.js";
 import { createLocalStore } from "./storage.local.js";
 
-const TYPE_COLOR = { facture: "#0E8A5F", achat: "#9C4221", sortie: "#C9760A", retour: "#C2334D", remise: "#5B62B5", contre: "#15233F" };
+const TYPE_COLOR = { facture: "#0E8A5F", achat: "#9C4221", sortie: "#C9760A", retour: "#C2334D", depot: "#0F766E", remise: "#5B62B5", contre: "#15233F" };
 const DENOMS = [50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1]; // centimes
 const $ = id => document.getElementById(id);
 
@@ -424,6 +424,27 @@ async function doRemise(){
   finally { btn.disabled = false; btn.textContent = label; }
 }
 
+// ───────── mise en caisse (apport d'espèces par la compta) ─────────
+function openDepot(){
+  const t = computeTotals();
+  $("dp-th").textContent = money(t.soldeEspeces);
+  $("dp-amount").value = ""; $("dp-note").value = ""; $("dp-err").textContent = "";
+  $("depotModal").hidden = false;
+}
+async function doDepot(){
+  if (!isFondLocked()){ $("dp-err").textContent = "Valide d'abord le fond de caisse du jour."; return; }
+  const n = parseAmt($("dp-amount").value);
+  if (isNaN(n) || n <= 0){ $("dp-err").textContent = "Indique un montant."; return; }
+  const note = $("dp-note").value.trim();
+  if (!window.confirm("Enregistrer une mise en caisse ?\n\nMontant reçu : " + num2(n) + " € (espèces)" + (note ? ("\nNote : " + note) : ""))) return;
+  const btn = $("dp-save"), label = btn.textContent; btn.disabled = true; btn.textContent = "…";
+  try {
+    await addEntry({ typeKey: "depot", montant: n, mode: "Espèces", ndoc: note, nom: "", prenom: "", nchq: "", banque: "", operateur: state.operateur, photoPath: "", photo: "" });
+    $("depotModal").hidden = true; toast("Mise en caisse enregistrée");
+  } catch (e) { console.error(e); $("dp-err").textContent = "Enregistrement impossible — vérifie la connexion."; }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+
 // ───────── vérifier la caisse (à blanc) ─────────
 function setEcartBox(box, b, ec){
   b.textContent = signMoney(ec);
@@ -540,6 +561,7 @@ function buildZHTML(key){
   h += zLine("Ventes (factures)", money(r.ventes));
   h += '<div class="z-detail">' + zLine("· espèces", money(r.ventesEsp)) +
        zLine("· chèques", money(r.ventesChq)) + zLine("· CB", money(r.ventesCb)) + "</div>";
+  if (r.depots) h += zLine("Mise en caisse (apport compta)", money(r.depots));
   if (r.achats) h += zLine("Achats payés", money(r.achats));
   if (r.sorties) h += zLine("Sorties d’espèces", money(r.sorties));
   if (r.retours) h += zLine("Retours / remboursements", money(r.retours));
@@ -868,6 +890,9 @@ function wireUI(){
 
   // remise + vérif caisse
   $("btn-remise").addEventListener("click", openRemise);
+  $("btn-depot").addEventListener("click", openDepot);
+  $("dp-close").addEventListener("click", () => { $("depotModal").hidden = true; });
+  $("dp-save").addEventListener("click", doDepot);
   $("rm-close").addEventListener("click", () => { $("remiseModal").hidden = true; });
   $("rm-save").addEventListener("click", doRemise);
   $("rm-chq-list").addEventListener("change", updateRemiseChqSum);

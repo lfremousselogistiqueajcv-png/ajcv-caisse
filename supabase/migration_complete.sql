@@ -7,7 +7,7 @@
 alter table public.caisse_operations drop constraint if exists caisse_operations_type_check;
 alter table public.caisse_operations
   add constraint caisse_operations_type_check
-  check (type in ('facture','achat','sortie','retour','remise','contre'));
+  check (type in ('facture','achat','sortie','retour','remise','contre','depot'));
 
 -- ───── Comptage des chèques dans la clôture ─────
 alter table public.caisse_clotures add column if not exists theorique_cheque numeric(12,2) not null default 0;

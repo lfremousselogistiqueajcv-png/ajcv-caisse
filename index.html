@@ -86,6 +86,7 @@
       <div class="stat"><div class="n" id="st-nb">0</div><div class="t">Opérations</div></div>
     </div>
     <div class="dash-actions">
+      <button type="button" id="btn-depot">Mise en caisse</button>
       <button type="button" id="btn-remise">Remise compta</button>
       <button type="button" id="btn-check">Vérifier la caisse</button>
       <button type="button" id="btn-suivi" hidden>Suivi des caisses</button>
@@ -211,8 +212,23 @@
     <div id="cl-done" class="cl-done" hidden></div>
   </section>
 
-  <footer class="build">AJCV Caisse · v2.2</footer>
+  <footer class="build">AJCV Caisse · v2.3</footer>
 
+</div>
+
+<!-- MODALE MISE EN CAISSE -->
+<div class="modal-overlay" id="depotModal" hidden>
+  <div class="modal-card">
+    <div class="modal-h"><h2>Mise en caisse</h2><button type="button" class="modal-x" id="dp-close" aria-label="Fermer">✕</button></div>
+    <p class="dp-note">Monnaie / espèces remises par la comptabilité pour approvisionner la caisse.</p>
+    <div class="dp-cur"><span>Espèces en caisse</span><b id="dp-th">0,00 €</b></div>
+    <label class="dp-lbl" for="dp-amount">Montant reçu</label>
+    <input id="dp-amount" inputmode="decimal" placeholder="0,00" autocomplete="off">
+    <label class="dp-lbl" for="dp-note">Note (facultatif)</label>
+    <input id="dp-note" placeholder="ex. appoint monnaie" autocomplete="off">
+    <div class="err" id="dp-err"></div>
+    <button type="button" class="save" id="dp-save">Enregistrer la mise en caisse</button>
+  </div>
 </div>
 
 <!-- MODALE REMISE COMPTA -->

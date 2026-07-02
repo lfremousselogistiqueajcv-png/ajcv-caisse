@@ -50,7 +50,7 @@ create table if not exists public.caisse_operations (
   user_id     uuid not null default auth.uid(),      -- auteur réel (audit)
   op_date     date  not null,
   op_time     text  not null,
-  type        text  not null check (type in ('facture','achat','sortie','retour','remise','contre')),
+  type        text  not null check (type in ('facture','achat','sortie','retour','remise','contre','depot')),
   sens        smallint not null check (sens in (-1, 1)),
   montant     numeric(12,2) not null check (montant >= 0),
   mode        text,

@@ -8,6 +8,7 @@ export const TYPES = {
   achat:   { label: "Facture achat",    sens: -1, cls: "achat" },
   sortie:  { label: "Sortie de caisse", sens: -1, cls: "sortie" },
   retour:  { label: "Retour d'argent",  sens: -1, cls: "retour" },
+  depot:   { label: "Mise en caisse",   sens: 1,  cls: "depot" },
   remise:  { label: "Remise compta",    sens: -1, cls: "remise" },
   contre:  { label: "Contre-passation", sens: 0,  cls: "contre" }
 };
@@ -278,7 +279,7 @@ export function exportCloturesRows(scope){
 // ---------- suivi journalier (traçabilité / anti-vol) ----------
 // Agrège tout ce qui est enregistré pour un jour donné.
 export function daySummary(key){
-  let ventes = 0, achats = 0, sorties = 0, remises = 0, retours = 0, nb = 0;
+  let ventes = 0, achats = 0, sorties = 0, remises = 0, retours = 0, depots = 0, nb = 0;
   state.entries.forEach(e => {
     if (e.dateKey !== key) return; nb++;
     if (e.typeKey === "facture") ventes += e.montant;
@@ -286,6 +287,7 @@ export function daySummary(key){
     else if (e.typeKey === "sortie") sorties += e.montant;
     else if (e.typeKey === "remise") remises += e.montant;
     else if (e.typeKey === "retour") retours += e.montant;
+    else if (e.typeKey === "depot") depots += e.montant;
   });
   const meta = state.fondsMeta[key] || {};
   const c = state.clotures[key] || null;
@@ -294,7 +296,7 @@ export function daySummary(key){
     fond: state.fonds[key] || 0, locked: !!state.fondsLocked[key],
     attendu: (meta.attendu != null) ? meta.attendu : null,
     ecartOuv: (meta.ecart != null) ? meta.ecart : null,
-    ventes, achats, sorties, remises, retours, nb, clot: c
+    ventes, achats, sorties, remises, retours, depots, nb, clot: c
   };
 }
 // Tous les jours connus (opérations, clôtures ou fonds), récents d'abord.
@@ -329,7 +331,7 @@ export function dayReport(key){
 export function exportSuiviRows(){
   const rows = [[
     "Date", "Fond ouverture", "Attendu ouverture", "Écart ouverture",
-    "Ventes", "Achats", "Sorties", "Remises", "Nb opérations",
+    "Ventes", "Mise en caisse", "Achats", "Sorties", "Remises", "Nb opérations",
     "Comptage espèces", "Écart espèces", "Comptage chèques", "Écart chèques", "Clôturé par"
   ]];
   allDays().slice().reverse().forEach(k => {
@@ -338,7 +340,7 @@ export function exportSuiviRows(){
       s.date, num2(s.fond),
       s.attendu != null ? num2(s.attendu) : "",
       s.ecartOuv != null ? num2(s.ecartOuv) : "",
-      num2(s.ventes), num2(s.achats), num2(s.sorties), num2(s.remises), s.nb,
+      num2(s.ventes), num2(s.depots), num2(s.achats), num2(s.sorties), num2(s.remises), s.nb,
       c ? num2(c.comptage) : "", c ? num2(c.ecart) : "",
       c ? num2(c.comptageCheque || 0) : "", c ? num2(c.ecartCheque || 0) : "",
       c ? (c.operateur || "") : "(non clôturé)"
