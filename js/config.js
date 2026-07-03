@@ -12,7 +12,7 @@
 // règles RLS définies dans schema.sql). Ne mets JAMAIS la clé "service_role" ici.
 
 export const CONFIG = {
-  USE_SUPABASE: false,
-  SUPABASE_URL: "https://YOUR-PROJECT.supabase.co",
-  SUPABASE_ANON_KEY: "YOUR-ANON-PUBLIC-KEY"
+  USE_SUPABASE: true,
+  SUPABASE_URL: "https://adktjeubdoeezmhmdbit.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_NEpTmygB6vPZms7vIBbSnw_aNBZlEOM"
 };
