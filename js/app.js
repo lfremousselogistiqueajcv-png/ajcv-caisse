@@ -15,7 +15,7 @@ import * as prefs from "./prefs.js";
 import * as auth from "./auth.js";
 import { createLocalStore } from "./storage.local.js";
 
-const TYPE_COLOR = { facture: "#0E8A5F", achat: "#9C4221", sortie: "#C9760A", retour: "#C2334D", depot: "#0F766E", remise: "#5B62B5", contre: "#15233F" };
+const TYPE_COLOR = { facture: "#0E8A5F", achat: "#9C4221", sortie: "#C9760A", retour: "#0E8A5F", depot: "#0F766E", remise: "#5B62B5", contre: "#15233F" };
 const DENOMS = [50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1]; // centimes
 const $ = id => document.getElementById(id);
 
@@ -317,7 +317,7 @@ function validate(){
   if (isNaN(m) || m <= 0) return "Saisis un montant supérieur à 0.";
   if (!form.mode) return "Choisis un mode de règlement.";
   if (!$("nom").value.trim()) return "Le nom est obligatoire.";
-  if ((form.type === "facture" || form.type === "achat" || form.type === "retour") && !$("ndoc").value.trim())
+  if ((form.type === "facture" || form.type === "achat") && !$("ndoc").value.trim())
     return "Le n° de document est obligatoire pour ce type.";
   if (form.mode === "Chèque" && !$("nchq").value.trim()) return "Indique le n° du chèque.";
   return "";
@@ -564,7 +564,7 @@ function buildZHTML(key){
   if (r.depots) h += zLine("Mise en caisse (apport compta)", money(r.depots));
   if (r.achats) h += zLine("Achats payés", money(r.achats));
   if (r.sorties) h += zLine("Sorties d’espèces", money(r.sorties));
-  if (r.retours) h += zLine("Retours / remboursements", money(r.retours));
+  if (r.retours) h += zLine("Retours d'argent (rentrée)", money(r.retours));
   if (r.remises) h += zLine("Remises à la compta", money(r.remises));
   h += zLine("Nombre d’opérations", String(r.nb)) + "</div>";
   h += '<div class="z-sec"><div class="z-sec-t">Espèces</div>';

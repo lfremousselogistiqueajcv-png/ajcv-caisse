@@ -70,7 +70,7 @@ body{
 .seg button[aria-pressed="true"]{transform:translateY(-1px); box-shadow:var(--shadow-sm)}
 .seg button.facture[aria-pressed="true"]{background:var(--in-soft); border-color:var(--in); color:var(--in)}
 .seg button.sortie[aria-pressed="true"]{background:var(--out-soft); border-color:var(--out); color:var(--out)}
-.seg button.retour[aria-pressed="true"]{background:var(--ret-soft); border-color:var(--ret); color:var(--ret)}
+.seg button.retour[aria-pressed="true"]{background:var(--in-soft); border-color:var(--in); color:var(--in)}
 
 .amount{position:relative; margin-top:2px}
 .amount input{width:100%; font-family:var(--mono); font-size:34px; font-weight:700; font-variant-numeric:tabular-nums;
@@ -117,16 +117,16 @@ body{
 .ticket{background:#fff; border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:12px; padding:12px 13px;
   animation:rise .25s ease both}
 .ticket.facture{border-left-color:var(--in)} .ticket.sortie{border-left-color:var(--out)}
-.ticket.retour{border-left-color:var(--ret)} .ticket.contre{border-left-color:var(--muted)}
+.ticket.retour{border-left-color:var(--in)} .ticket.contre{border-left-color:var(--muted)}
 .tk-top{display:flex; align-items:center; justify-content:space-between; gap:8px}
 .tk-id{font-family:var(--mono); font-size:12px; color:var(--muted)}
 .tk-lock{font-size:11px; color:var(--muted); display:inline-flex; align-items:center; gap:4px}
 .tk-row{display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-top:4px}
 .tk-type{font-weight:700; font-size:14px}
 .ticket.facture .tk-type{color:var(--in)} .ticket.sortie .tk-type{color:var(--out)}
-.ticket.retour .tk-type{color:var(--ret)} .ticket.contre .tk-type{color:var(--ink-soft)}
+.ticket.retour .tk-type{color:var(--in)} .ticket.contre .tk-type{color:var(--ink-soft)}
 .tk-amt{font-family:var(--mono); font-size:20px; font-weight:600; font-variant-numeric:tabular-nums}
-.ticket.facture .tk-amt{color:var(--in)} .ticket.sortie .tk-amt,.ticket.retour .tk-amt{color:var(--out)}
+.ticket.facture .tk-amt,.ticket.retour .tk-amt{color:var(--in)} .ticket.sortie .tk-amt{color:var(--out)}
 .ticket.contre .tk-amt{color:var(--ink-soft)}
 .tk-meta{font-size:12.5px; color:var(--ink-soft); margin-top:6px; display:flex; flex-wrap:wrap; gap:4px 12px}
 .tk-meta span b{color:var(--muted); font-weight:600}
