@@ -44,7 +44,7 @@ export function createSupabaseStore(sb){
 
     async list(){
       const { data: ops, error } = await sb
-        .from("caisse_operations").select("*").order("numero", { ascending: false });
+        .from("caisse_operations").select("*").order("numero", { ascending: false }).range(0, 4999);
       if (error) throw error;
       const { data: fo, error: fe } = await sb.from("caisse_fonds").select("*");
       if (fe) throw fe;

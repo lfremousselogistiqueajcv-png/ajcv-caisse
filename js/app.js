@@ -294,6 +294,7 @@ function applyRoleUI(){
   $("filters").hidden = !admin;
   $("btn-reset").hidden = !admin;
   $("btn-suivi").hidden = !admin;
+  $("btn-hist").hidden = !admin;
   $("btn-param").hidden = !(admin && sb);
   if (!admin){ scope = "day"; typeFilter = "all"; }
 }
@@ -584,6 +585,37 @@ function buildZHTML(key){
 function openZ(key){ $("z-body").innerHTML = buildZHTML(key); $("zModal").hidden = false; }
 function printZ(){ $("zPrint").innerHTML = $("z-body").innerHTML; window.print(); }
 
+// ───────── Historique & factures (admin) ─────────
+function openHist(){
+  $("hi-from").value = ""; $("hi-to").value = ""; $("hi-type").value = "all"; $("hi-photo").checked = false;
+  renderHist();
+  $("histModal").hidden = false;
+}
+function renderHist(){
+  const from = $("hi-from").value, to = $("hi-to").value, tf = $("hi-type").value, photoOnly = $("hi-photo").checked;
+  let items = state.entries.slice();
+  if (from) items = items.filter(e => e.dateKey >= from);
+  if (to) items = items.filter(e => e.dateKey <= to);
+  if (tf !== "all") items = items.filter(e => e.typeKey === tf);
+  if (photoOnly) items = items.filter(e => e.photo || e.photoPath);
+  let inn = 0, out = 0;
+  items.forEach(e => { const s = e.sens * e.montant; if (s > 0) inn += s; else out += -s; });
+  $("hi-sum").textContent = items.length + " opération(s) · encaissé " + money(inn) + " · décaissé " + money(out);
+  if (!items.length){ $("hi-list").innerHTML = '<div class="pm-loading">Aucune opération pour ces critères.</div>'; return; }
+  $("hi-list").innerHTML = items.map(e => {
+    const hasPhoto = !!(e.photo || e.photoPath);
+    const sign = e.sens > 0 ? "+" : "−";
+    const who = (esc(e.nom) + " " + esc(e.prenom || "")).trim();
+    const sub = [e.ndoc ? ("N° " + esc(e.ndoc)) : "", who, e.nchq ? ("chèque " + esc(e.nchq)) : ""].filter(Boolean).join(" · ");
+    return '<div class="hi-item ' + TYPES[e.typeKey].cls + '">' +
+      '<div class="hi-l"><div class="hi-t">#' + p3(e.seq) + " · " + TYPES[e.typeKey].label + "</div>" +
+        '<div class="hi-d">' + esc(e.date) + " · " + esc(e.heure) + (sub ? (" · " + sub) : "") + "</div></div>" +
+      '<div class="hi-r"><div class="hi-a">' + sign + " " + money(e.montant) + "</div>" +
+        (hasPhoto ? '<button type="button" class="tk-photo" data-photo="' + e.id + '">📷 Facture</button>' : "") +
+      "</div></div>";
+  }).join("");
+}
+
 // ───────── Paramètres : utilisateurs (admin, via la fonction serveur) ─────────
 function pmMsg(text, bad){
   const el = $("pm-msg");
@@ -709,13 +741,63 @@ function openSuivi(){
         svCell(c ? money(c.ecart) : "—", ecEspBad) +
         "<td>" + (c ? money(c.comptageCheque || 0) : "—") + "</td>" +
         svCell(c ? money(c.ecartCheque || 0) : "—", ecChqBad) +
-        "<td>" + (c ? '<span class="sv-ok">clôturé</span>' : '<span class="sv-no">non clôturé</span>') + "</td>" +
+        "<td>" + (c ? '<span class="sv-ok">clôturé</span>'
+                    : (k < todayKey()
+                       ? '<span class="sv-no">non clôturé</span> <button type="button" class="sv-clbtn" data-key="' + k + '">Clôturer</button>'
+                       : '<span class="sv-no">non clôturé</span>')) + "</td>" +
         '<td class="sv-z"><button type="button" class="sv-zbtn" data-key="' + k + '">Z</button></td>' +
         "</tr>";
     });
   }
   $("suivi-body").innerHTML = head + body;
   $("suiviModal").hidden = false;
+}
+
+// ───────── clôture d'une journée passée (depuis le Suivi) ─────────
+let retroKey = null;
+function updateRetroEcart(){
+  const th = computeTotals(retroKey);
+  const e = parseAmt($("rt-esp").value);
+  const b1 = $("rt-ecartBox-esp");
+  if (isNaN(e)){ $("rt-ecart-esp").textContent = "—"; b1.classList.remove("ok", "ko"); }
+  else setEcartBox(b1, $("rt-ecart-esp"), e - th.soldeEspeces);
+  const cq = parseAmt($("rt-chq").value);
+  const b2 = $("rt-ecartBox-chq");
+  if (isNaN(cq)){ $("rt-ecart-chq").textContent = "—"; b2.classList.remove("ok", "ko"); }
+  else setEcartBox(b2, $("rt-ecart-chq"), cq - th.soldeCheques);
+}
+function openRetro(key){
+  retroKey = key;
+  const th = computeTotals(key);
+  $("rt-date").textContent = frDate(new Date(key + "T00:00:00"));
+  $("rt-th-esp").textContent = money(th.soldeEspeces);
+  $("rt-th-chq").textContent = money(th.soldeCheques);
+  $("rt-esp").value = num2(th.soldeEspeces);
+  $("rt-chq").value = num2(th.soldeCheques);
+  $("rt-nb").value = "";
+  $("rt-err").textContent = "";
+  updateRetroEcart();
+  $("retroModal").hidden = false;
+}
+async function doRetro(){
+  if (!retroKey) return;
+  const esp = parseAmt($("rt-esp").value);
+  if (isNaN(esp) || esp < 0){ $("rt-err").textContent = "Saisis le comptage espèces."; return; }
+  const chq = parseAmt($("rt-chq").value); const compChq = isNaN(chq) ? 0 : chq;
+  const nb = parseInt($("rt-nb").value, 10) || 0;
+  const th = computeTotals(retroKey);
+  const d = frDate(new Date(retroKey + "T00:00:00"));
+  if (!window.confirm("Clôturer la journée du " + d + " ?\n" +
+    "Espèces : théorique " + num2(th.soldeEspeces) + " · compté " + num2(esp) + " · écart " + num2(esp - th.soldeEspeces) + "\n" +
+    "Chèques : théorique " + num2(th.soldeCheques) + " · compté " + num2(compChq) + " · écart " + num2(compChq - th.soldeCheques) + "\n" +
+    "La clôture est définitive.")) return;
+  const btn = $("rt-save"), label = btn.textContent; btn.disabled = true; btn.textContent = "Clôture…";
+  try {
+    await addCloture({ comptageEspeces: esp, comptageCheques: compChq, nbCheques: nb }, retroKey);
+    $("retroModal").hidden = true; toast("Journée du " + d + " clôturée");
+    openSuivi();
+  } catch (e) { console.error(e); $("rt-err").textContent = "Clôture impossible (déjà clôturée ?)."; }
+  finally { btn.disabled = false; btn.textContent = label; }
 }
 
 // ───────── toast / horloge ─────────
@@ -905,8 +987,22 @@ function wireUI(){
   $("btn-check").addEventListener("click", openCheck);
   $("ck-close").addEventListener("click", () => { $("checkModal").hidden = true; });
   $("btn-suivi").addEventListener("click", openSuivi);
+  $("btn-hist").addEventListener("click", openHist);
+  $("hi-close").addEventListener("click", () => { $("histModal").hidden = true; });
+  ["hi-from", "hi-to", "hi-type", "hi-photo"].forEach(id => $(id).addEventListener("change", renderHist));
+  $("hi-list").addEventListener("click", ev => {
+    const ph = ev.target.closest(".tk-photo"); if (!ph) return;
+    const e = state.entries.find(x => x.id === ph.dataset.photo); if (e) openPhoto(e);
+  });
   $("sv-close").addEventListener("click", () => { $("suiviModal").hidden = true; });
-  $("suivi-body").addEventListener("click", ev => { const b = ev.target.closest(".sv-zbtn"); if (b) openZ(b.dataset.key); });
+  $("suivi-body").addEventListener("click", ev => {
+    const z = ev.target.closest(".sv-zbtn"); if (z){ openZ(z.dataset.key); return; }
+    const cl = ev.target.closest(".sv-clbtn"); if (cl){ openRetro(cl.dataset.key); }
+  });
+  $("rt-close").addEventListener("click", () => { $("retroModal").hidden = true; });
+  $("rt-save").addEventListener("click", doRetro);
+  $("rt-esp").addEventListener("input", updateRetroEcart);
+  $("rt-chq").addEventListener("input", updateRetroEcart);
   $("z-close").addEventListener("click", () => { $("zModal").hidden = true; });
   $("z-print-btn").addEventListener("click", printZ);
   $("cl-done").addEventListener("click", ev => { if (ev.target.closest("#cl-z")) openZ(todayKey()); });

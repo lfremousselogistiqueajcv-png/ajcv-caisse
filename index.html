@@ -90,6 +90,7 @@
       <button type="button" id="btn-remise">Remise compta</button>
       <button type="button" id="btn-check">Vérifier la caisse</button>
       <button type="button" id="btn-suivi" hidden>Suivi des caisses</button>
+      <button type="button" id="btn-hist" hidden>Historique &amp; factures</button>
       <button type="button" id="btn-param" hidden>Paramètres</button>
       <button type="button" id="btn-reset" hidden>Réinitialiser (tout effacer)</button>
     </div>
@@ -212,7 +213,7 @@
     <div id="cl-done" class="cl-done" hidden></div>
   </section>
 
-  <footer class="build">AJCV Caisse · v2.5</footer>
+  <footer class="build">AJCV Caisse · v2.7</footer>
 
 </div>
 
@@ -286,6 +287,54 @@
     <div class="modal-h"><h2>Suivi des caisses</h2><button type="button" class="modal-x" id="sv-close" aria-label="Fermer">✕</button></div>
     <p class="suivi-note">Un jour par ligne. Les écarts non nuls (ouverture ou clôture) sont signalés en rouge.</p>
     <div class="suivi-scroll"><table class="suivi-table" id="suivi-table"><tbody id="suivi-body"></tbody></table></div>
+  </div>
+</div>
+
+<!-- HISTORIQUE & FACTURES (admin) -->
+<div class="modal-overlay" id="histModal" hidden>
+  <div class="modal-card hist-card">
+    <div class="modal-h"><h2>Historique &amp; factures</h2><button type="button" class="modal-x" id="hi-close" aria-label="Fermer">✕</button></div>
+    <div class="hi-filters">
+      <div class="hi-dates">
+        <label>Du <input type="date" id="hi-from"></label>
+        <label>Au <input type="date" id="hi-to"></label>
+      </div>
+      <div class="hi-row2">
+        <select id="hi-type">
+          <option value="all">Tous les types</option>
+          <option value="facture">Facture vente</option>
+          <option value="achat">Facture achat</option>
+          <option value="sortie">Sortie de caisse</option>
+          <option value="retour">Retour d'argent</option>
+          <option value="depot">Mise en caisse</option>
+          <option value="remise">Remise compta</option>
+          <option value="contre">Contre-passation</option>
+        </select>
+        <label class="hi-chk"><input type="checkbox" id="hi-photo"> Avec facture (photo)</label>
+      </div>
+    </div>
+    <div class="hi-sum" id="hi-sum"></div>
+    <div class="hi-list" id="hi-list"></div>
+  </div>
+</div>
+
+<!-- CLÔTURE D'UNE JOURNÉE PASSÉE -->
+<div class="modal-overlay" id="retroModal" hidden>
+  <div class="modal-card">
+    <div class="modal-h"><h2>Clôturer une journée passée</h2><button type="button" class="modal-x" id="rt-close" aria-label="Fermer">✕</button></div>
+    <p class="dp-note">Journée : <b id="rt-date"></b>. Elle n'a pas été clôturée sur le moment, donc les espèces ont été reportées sur les jours suivants. Tu peux valider au théorique, ou saisir le comptage réel si tu l'as noté.</p>
+    <div class="dp-cur"><span>Théorique espèces</span><b id="rt-th-esp">0,00 €</b></div>
+    <label class="dp-lbl" for="rt-esp">Comptage espèces</label>
+    <input id="rt-esp" inputmode="decimal" autocomplete="off">
+    <div class="cl-ecart" id="rt-ecartBox-esp"><span>Écart espèces</span><b id="rt-ecart-esp">—</b></div>
+    <div class="dp-cur" style="margin-top:14px"><span>Théorique chèques</span><b id="rt-th-chq">0,00 €</b></div>
+    <label class="dp-lbl" for="rt-chq">Comptage chèques</label>
+    <input id="rt-chq" inputmode="decimal" autocomplete="off">
+    <label class="dp-lbl" for="rt-nb">Nombre de chèques</label>
+    <input id="rt-nb" inputmode="numeric" autocomplete="off">
+    <div class="cl-ecart" id="rt-ecartBox-chq"><span>Écart chèques</span><b id="rt-ecart-chq">—</b></div>
+    <div class="err" id="rt-err"></div>
+    <button type="button" class="save" id="rt-save">Clôturer cette journée</button>
   </div>
 </div>
 
