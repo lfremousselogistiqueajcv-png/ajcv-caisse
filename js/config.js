@@ -14,5 +14,5 @@
 export const CONFIG = {
   USE_SUPABASE: true,
   SUPABASE_URL: "https://adktjeubdoeezmhmdbit.supabase.co",
-  SUPABASE_ANON_KEY: "sb_publishable_NEpTmygB6vPZms7vIBbSnw_aNBZlEOM"
+  SUPABASE_ANON_KEY: "sb_publishable_NEpTmygB6vPZms7vIBbSnw_aNBZlEOM
 };

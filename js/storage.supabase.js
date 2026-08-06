@@ -13,7 +13,7 @@ export function createSupabaseStore(sb){
       nom: e.nom || null, prenom: e.prenom || null,
       n_cheque: e.nchq || null, banque: e.banque || null,
       operateur: e.operateur || null, ref_numero: e.refSeq || null,
-      photo_path: e.photoPath || null
+      photo_path: (e.photoPaths && e.photoPaths.length) ? e.photoPaths.join("\n") : (e.photoPath || null)
     };
   }
   function fromRow(r){
@@ -24,7 +24,7 @@ export function createSupabaseStore(sb){
       mode: r.mode || "", ndoc: r.n_doc || "", nom: r.nom || "", prenom: r.prenom || "",
       nchq: r.n_cheque || "", banque: r.banque || "",
       operateur: r.operateur || "", refSeq: r.ref_numero || null,
-      photoPath: r.photo_path || ""
+      photoPaths: r.photo_path ? String(r.photo_path).split("\n").filter(Boolean) : []
     };
   }
   function clFromRow(r){

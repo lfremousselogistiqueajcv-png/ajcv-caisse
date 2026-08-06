@@ -139,14 +139,13 @@
         <div class="inp"><label for="banque">Banque <span style="color:var(--muted)">(facultatif)</span></label><input id="banque" autocomplete="off" placeholder="Banque"></div>
       </div>
 
-      <div class="lbl-row">Photo du paiement <span style="color:var(--muted)">(facultatif)</span></div>
+      <div class="lbl-row">Photos (factures / justificatifs) <span style="color:var(--muted)">(facultatif — plusieurs possibles)</span></div>
       <div class="photo-pick">
-        <input id="photo-file" type="file" accept="image/*" capture="environment" hidden>
-        <button type="button" class="photo-btn" id="photo-add">📷 Ajouter une photo</button>
-        <div class="photo-prev" id="photo-prev" hidden>
-          <img id="photo-thumb" alt="aperçu de la photo">
-          <button type="button" class="photo-rm" id="photo-rm" aria-label="Retirer la photo">✕</button>
-        </div>
+        <input id="photo-cam" type="file" accept="image/*" capture="environment" hidden>
+        <input id="photo-file" type="file" accept="image/*" multiple hidden>
+        <button type="button" class="photo-btn" id="photo-cam-btn">📷 Prendre une photo</button>
+        <button type="button" class="photo-btn" id="photo-add">🖼️ Depuis la galerie</button>
+        <div class="photo-strip" id="photo-strip" hidden></div>
       </div>
 
       <div class="err" id="err"></div>
@@ -213,7 +212,7 @@
     <div id="cl-done" class="cl-done" hidden></div>
   </section>
 
-  <footer class="build">AJCV Caisse · v2.7</footer>
+  <footer class="build">AJCV Caisse · v2.9</footer>
 
 </div>
 
@@ -276,7 +275,7 @@
 <!-- VISIONNEUSE PHOTO -->
 <div class="modal-overlay" id="photoModal" hidden>
   <div class="modal-card photo-modal">
-    <div class="modal-h"><h2>Photo du paiement</h2><button type="button" class="modal-x" id="ph-close" aria-label="Fermer">✕</button></div>
+    <div class="modal-h"><h2>Photos / factures</h2><button type="button" class="modal-x" id="ph-close" aria-label="Fermer">✕</button></div>
     <div class="photo-view" id="ph-view"></div>
   </div>
 </div>

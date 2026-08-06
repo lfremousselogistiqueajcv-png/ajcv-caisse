@@ -47,7 +47,8 @@ export async function addEntry(pl){
     nchq: pl.nchq || "", banque: pl.banque || "",
     operateur: pl.operateur != null ? pl.operateur : state.operateur,
     refSeq: pl.refSeq || null,
-    photoPath: pl.photoPath || "", photo: pl.photo || ""
+    photoPaths: Array.isArray(pl.photoPaths) ? pl.photoPaths : (pl.photoPath ? [pl.photoPath] : []),
+    photos: Array.isArray(pl.photos) ? pl.photos : (pl.photo ? [pl.photo] : [])
   };
   const saved = await adapter.create(draft);
   if (saved !== draft && !state.entries.some(e => e.id === saved.id)) state.entries.unshift(saved);

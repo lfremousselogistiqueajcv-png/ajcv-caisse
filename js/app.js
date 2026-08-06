@@ -27,7 +27,7 @@ let currentUid = null;
 let booted = false;
 let setpwdMode = "account";
 let ckBuilt = false;
-let pendingPhoto = null;   // { blob, dataUrl } photo de l'opération en cours de saisie
+let pendingPhotos = [];   // [{ blob, dataUrl }] photos de l'opération en cours de saisie
 const LOGIN_KEY = "ajcv_caisse_login_at";
 const EIGHT_H = 8 * 60 * 60 * 1000;
 let sessionEnding = false;
@@ -152,31 +152,48 @@ function resizePhoto(file, cb){
   };
   fr.readAsDataURL(file);
 }
-function clearPhoto(){
-  pendingPhoto = null;
+function clearPhotos(){
+  pendingPhotos = [];
   $("photo-file").value = "";
-  $("photo-prev").hidden = true;
-  $("photo-add").hidden = false;
-  $("photo-thumb").removeAttribute("src");
+  renderPhotoStrip();
 }
-function onPhotoPick(file){
-  if (!file) return;
-  resizePhoto(file, res => {
-    if (!res){ toast("Image illisible"); return; }
-    pendingPhoto = res;
-    $("photo-thumb").src = res.dataUrl;
-    $("photo-prev").hidden = false;
-    $("photo-add").hidden = true;
-  });
+function renderPhotoStrip(){
+  const strip = $("photo-strip");
+  if (!pendingPhotos.length){ strip.innerHTML = ""; strip.hidden = true; return; }
+  strip.hidden = false;
+  strip.innerHTML = pendingPhotos.map((p, i) =>
+    '<div class="photo-cell"><img src="' + p.dataUrl + '" alt="photo ' + (i + 1) + '">' +
+    '<button type="button" class="photo-rm" data-idx="' + i + '" aria-label="Retirer">✕</button></div>'
+  ).join("");
 }
-async function openPhoto(entry){
+function onPhotoPick(files){
+  if (!files || !files.length) return;
+  const arr = Array.from(files);
+  let remaining = arr.length;
+  arr.forEach(f => resizePhoto(f, res => {
+    if (res) pendingPhotos.push(res);
+    if (--remaining === 0) renderPhotoStrip();
+  }));
+  $("photo-file").value = "";  // permet de re-choisir les mêmes fichiers
+}
+
+// Sources de photos d'une entrée (compat ancien champ unique)
+function entryPhotoData(e){ return (e.photos && e.photos.length) ? e.photos : (e.photo ? [e.photo] : []); }
+function entryPhotoPaths(e){ return (e.photoPaths && e.photoPaths.length) ? e.photoPaths : (e.photoPath ? [e.photoPath] : []); }
+function entryHasPhoto(e){ return entryPhotoData(e).length > 0 || entryPhotoPaths(e).length > 0; }
+
+async function openPhotos(entry){
   const view = $("ph-view");
   view.innerHTML = '<div class="ph-load">Chargement…</div>';
   $("photoModal").hidden = false;
   try {
-    let url = entry.photo || "";
-    if (!url && entry.photoPath) url = await photoUrl(entry.photoPath);
-    view.innerHTML = url ? ('<img src="' + url + '" alt="photo du paiement">') : '<div class="ph-load">Photo indisponible.</div>';
+    let urls = entryPhotoData(entry).slice();
+    if (!urls.length){
+      for (const p of entryPhotoPaths(entry)){ try { urls.push(await photoUrl(p)); } catch (e) {} }
+    }
+    view.innerHTML = urls.length
+      ? urls.map((u, i) => '<img src="' + u + '" alt="facture ' + (i + 1) + '">').join("")
+      : '<div class="ph-load">Photo indisponible.</div>';
   } catch (e) { view.innerHTML = '<div class="ph-load">Photo indisponible.</div>'; }
 }
 
@@ -199,7 +216,7 @@ function renderList(){
     if (e.operateur) meta += '<span><b>Caissier</b> ' + esc(e.operateur) + "</span>";
     const typeLabel = TYPES[e.typeKey].label + (e.refSeq ? (' <span class="tk-id">de #' + p3(e.refSeq) + "</span>") : "");
     const sign = e.sens > 0 ? "+" : "−";
-    const hasPhoto = !!(e.photo || e.photoPath);
+    const hasPhoto = entryHasPhoto(e); const nPhoto = entryPhotoData(e).length || entryPhotoPaths(e).length;
     html +=
       '<div class="ticket ' + TYPES[e.typeKey].cls + '">' +
         '<div class="tk-top"><span class="tk-id">#' + p3(e.seq) + '</span><span class="tk-lock">🔒 verrouillé</span></div>' +
@@ -208,7 +225,7 @@ function renderList(){
         '<div class="tk-meta">' + meta + "</div>" +
         '<div class="tk-foot"><span class="tk-time">' + e.date + " · " + e.heure + "</span>" +
           '<span class="tk-actions">' +
-            (hasPhoto ? '<button class="tk-photo" data-photo="' + e.id + '">📷 Voir la photo</button>' : "") +
+            (hasPhoto ? '<button class="tk-photo" data-photo="' + e.id + '">📷 ' + (nPhoto > 1 ? ("Voir les " + nPhoto + " photos") : "Voir la photo") + "</button>" : "") +
             (e.typeKey === "contre" ? "" : '<button class="tk-fix" data-fix="' + e.id + '">Corriger</button>') +
           "</span>" +
         "</div>" +
@@ -303,7 +320,7 @@ function applyRoleUI(){
 function clearForm(keepTypeMode){
   ["montant", "ndoc", "nom", "prenom", "nchq", "banque"].forEach(id => { $(id).value = ""; });
   $("err").textContent = "";
-  clearPhoto();
+  clearPhotos();
   if (!keepTypeMode){
     form.type = null; form.mode = null;
     document.querySelectorAll("#seg-type button,#seg-mode button").forEach(b => b.setAttribute("aria-pressed", "false"));
@@ -341,13 +358,16 @@ async function doSave(){
   const btn = $("save"), label = btn.textContent;
   btn.disabled = true; btn.textContent = "Enregistrement…";
   try {
-    let photoPath = "", photo = "";
-    if (pendingPhoto){
+    let photoPaths = [], photos = [];
+    if (pendingPhotos.length){
       if (sb){
-        try { photoPath = await uploadPhoto(pendingPhoto.blob); }
-        catch (e) { console.error(e); toast("Photo non envoyée — opération enregistrée sans photo"); }
+        for (const p of pendingPhotos){
+          try { photoPaths.push(await uploadPhoto(p.blob)); }
+          catch (e) { console.error(e); }
+        }
+        if (photoPaths.length < pendingPhotos.length) toast("Certaines photos n'ont pas été envoyées");
       } else {
-        photo = pendingPhoto.dataUrl;
+        photos = pendingPhotos.map(p => p.dataUrl);
       }
     }
     await addEntry({
@@ -355,7 +375,7 @@ async function doSave(){
       ndoc: $("ndoc").value.trim(), nom: $("nom").value.trim(), prenom: $("prenom").value.trim(),
       nchq: form.mode === "Chèque" ? $("nchq").value.trim() : "",
       banque: form.mode === "Chèque" ? $("banque").value.trim() : "",
-      operateur: state.operateur, photoPath, photo
+      operateur: state.operateur, photoPaths, photos
     });
     clearForm(true);
     toast("Opération enregistrée");
@@ -440,7 +460,7 @@ async function doDepot(){
   if (!window.confirm("Enregistrer une mise en caisse ?\n\nMontant reçu : " + num2(n) + " € (espèces)" + (note ? ("\nNote : " + note) : ""))) return;
   const btn = $("dp-save"), label = btn.textContent; btn.disabled = true; btn.textContent = "…";
   try {
-    await addEntry({ typeKey: "depot", montant: n, mode: "Espèces", ndoc: note, nom: "", prenom: "", nchq: "", banque: "", operateur: state.operateur, photoPath: "", photo: "" });
+    await addEntry({ typeKey: "depot", montant: n, mode: "Espèces", ndoc: note, nom: "", prenom: "", nchq: "", banque: "", operateur: state.operateur, photoPaths: [], photos: [] });
     $("depotModal").hidden = true; toast("Mise en caisse enregistrée");
   } catch (e) { console.error(e); $("dp-err").textContent = "Enregistrement impossible — vérifie la connexion."; }
   finally { btn.disabled = false; btn.textContent = label; }
@@ -603,7 +623,7 @@ function renderHist(){
   $("hi-sum").textContent = items.length + " opération(s) · encaissé " + money(inn) + " · décaissé " + money(out);
   if (!items.length){ $("hi-list").innerHTML = '<div class="pm-loading">Aucune opération pour ces critères.</div>'; return; }
   $("hi-list").innerHTML = items.map(e => {
-    const hasPhoto = !!(e.photo || e.photoPath);
+    const hasPhoto = entryHasPhoto(e); const nPhoto = entryPhotoData(e).length || entryPhotoPaths(e).length;
     const sign = e.sens > 0 ? "+" : "−";
     const who = (esc(e.nom) + " " + esc(e.prenom || "")).trim();
     const sub = [e.ndoc ? ("N° " + esc(e.ndoc)) : "", who, e.nchq ? ("chèque " + esc(e.nchq)) : ""].filter(Boolean).join(" · ");
@@ -611,7 +631,7 @@ function renderHist(){
       '<div class="hi-l"><div class="hi-t">#' + p3(e.seq) + " · " + TYPES[e.typeKey].label + "</div>" +
         '<div class="hi-d">' + esc(e.date) + " · " + esc(e.heure) + (sub ? (" · " + sub) : "") + "</div></div>" +
       '<div class="hi-r"><div class="hi-a">' + sign + " " + money(e.montant) + "</div>" +
-        (hasPhoto ? '<button type="button" class="tk-photo" data-photo="' + e.id + '">📷 Facture</button>' : "") +
+        (hasPhoto ? '<button type="button" class="tk-photo" data-photo="' + e.id + '">📷 ' + (nPhoto > 1 ? ("Factures (" + nPhoto + ")") : "Facture") + '</button>' : "") +
       "</div></div>";
   }).join("");
 }
@@ -992,7 +1012,7 @@ function wireUI(){
   ["hi-from", "hi-to", "hi-type", "hi-photo"].forEach(id => $(id).addEventListener("change", renderHist));
   $("hi-list").addEventListener("click", ev => {
     const ph = ev.target.closest(".tk-photo"); if (!ph) return;
-    const e = state.entries.find(x => x.id === ph.dataset.photo); if (e) openPhoto(e);
+    const e = state.entries.find(x => x.id === ph.dataset.photo); if (e) openPhotos(e);
   });
   $("sv-close").addEventListener("click", () => { $("suiviModal").hidden = true; });
   $("suivi-body").addEventListener("click", ev => {
@@ -1018,14 +1038,20 @@ function wireUI(){
   $("btn-reset").addEventListener("click", doReset);
 
   // photo du paiement
+  $("photo-cam-btn").addEventListener("click", () => $("photo-cam").click());
+  $("photo-cam").addEventListener("change", e => onPhotoPick(e.target.files));
   $("photo-add").addEventListener("click", () => $("photo-file").click());
-  $("photo-file").addEventListener("change", e => onPhotoPick(e.target.files && e.target.files[0]));
-  $("photo-rm").addEventListener("click", clearPhoto);
+  $("photo-file").addEventListener("change", e => onPhotoPick(e.target.files));
+  $("photo-strip").addEventListener("click", ev => {
+    const b = ev.target.closest(".photo-rm"); if (!b) return;
+    pendingPhotos.splice(parseInt(b.dataset.idx, 10), 1);
+    renderPhotoStrip();
+  });
   $("ph-close").addEventListener("click", () => { $("photoModal").hidden = true; $("ph-view").innerHTML = ""; });
 
   $("list").addEventListener("click", async ev => {
     const ph = ev.target.closest("[data-photo]");
-    if (ph){ const e = state.entries.find(x => x.id === ph.dataset.photo); if (e) openPhoto(e); return; }
+    if (ph){ const e = state.entries.find(x => x.id === ph.dataset.photo); if (e) openPhotos(e); return; }
     const b = ev.target.closest("[data-fix]"); if (!b) return;
     const e = state.entries.find(x => x.id === b.dataset.fix); if (!e) return;
     if (window.confirm("Contre-passer #" + p3(e.seq) + " (" + TYPES[e.typeKey].label + " " + num2(e.montant) +
