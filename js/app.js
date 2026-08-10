@@ -18,6 +18,8 @@ import { createLocalStore } from "./storage.local.js";
 const TYPE_COLOR = { facture: "#0E8A5F", achat: "#9C4221", sortie: "#C9760A", retour: "#0E8A5F", depot: "#0F766E", remise: "#5B62B5", contre: "#15233F" };
 const DENOMS = [50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1]; // centimes
 const $ = id => document.getElementById(id);
+// câblage défensif : un élément manquant (ex. cache mélangé) ne bloque plus le reste
+const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); else console.warn("[caisse] élément absent:", id); };
 
 const form = { type: null, mode: null };
 let scope = "day";
@@ -488,7 +490,7 @@ function updateCheck(){
 function openCheck(){
   if (!ckBuilt){
     buildDenom("ck", $("ck-denom"));
-    $("ck-denom").addEventListener("input", updateCheck);
+    on("ck-denom", "input", updateCheck);
     wireChqRows("ck", updateCheck);
     ckBuilt = true;
   }
@@ -938,117 +940,117 @@ async function doFondLock(){
 // ───────── câblage statique ─────────
 function wireUI(){
   buildDenom("cl", $("cl-denom"));
-  $("cl-denom").addEventListener("input", () => { $("cl-reel").value = num2(sumDenom("cl")); updateEcart(); });
-  $("cl-reel").addEventListener("input", updateEcart);
+  on("cl-denom", "input", () => { $("cl-reel").value = num2(sumDenom("cl")); updateEcart(); });
+  on("cl-reel", "input", updateEcart);
   resetChqRows("cl");
   wireChqRows("cl", updateEcartChq);
-  $("cl-save").addEventListener("click", doCloture);
+  on("cl-save", "click", doCloture);
 
-  $("seg-type").addEventListener("click", ev => {
+  on("seg-type", "click", ev => {
     const b = ev.target.closest("button"); if (!b) return;
     form.type = b.dataset.type;
     ev.currentTarget.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
     setAccent(form.type); $("err").textContent = "";
   });
-  $("seg-mode").addEventListener("click", ev => {
+  on("seg-mode", "click", ev => {
     const b = ev.target.closest("button"); if (!b) return;
     form.mode = b.dataset.mode;
     ev.currentTarget.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
     toggleCheque(); $("err").textContent = "";
   });
-  $("save").addEventListener("click", doSave);
-  $("montant").addEventListener("keydown", e => { if (e.key === "Enter") doSave(); });
+  on("save", "click", doSave);
+  on("montant", "keydown", e => { if (e.key === "Enter") doSave(); });
 
-  $("oper").addEventListener("input", function(){ prefs.setOperateur(this.value); setOperateur(this.value); });
+  on("oper", "input", function(){ prefs.setOperateur(this.value); setOperateur(this.value); });
 
-  $("fond").addEventListener("input", function(){
+  on("fond", "input", function(){
     if (isFondLocked()) return;
     state.fonds[todayKey()] = isNaN(parseAmt(this.value)) ? 0 : parseAmt(this.value);
     renderDash(); renderCloture();
   });
-  $("fond").addEventListener("blur", async function(){
+  on("fond", "blur", async function(){
     if (isFondLocked()) return;
     const n = parseAmt(this.value); this.value = isNaN(n) ? "" : num2(n);
     try { await persistFond(); } catch (e) { toast("Fond de caisse non enregistré"); }
   });
-  $("fond-lock").addEventListener("click", doFondLock);
+  on("fond-lock", "click", doFondLock);
 
-  $("scope").addEventListener("click", ev => {
+  on("scope", "click", ev => {
     const b = ev.target.closest("button"); if (!b) return; scope = b.dataset.scope;
     ev.currentTarget.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
     renderList();
   });
-  $("filters").addEventListener("click", ev => {
+  on("filters", "click", ev => {
     const b = ev.target.closest("button"); if (!b) return; typeFilter = b.dataset.filter;
     ev.currentTarget.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
     renderList();
   });
 
-  $("exp-xlsx").addEventListener("click", exportXlsx);
-  $("exp-copy").addEventListener("click", () => {
+  on("exp-xlsx", "click", exportXlsx);
+  on("exp-copy", "click", () => {
     const rows = exportRows(scope);
     if (rows.length < 2){ toast("Rien à copier"); return; }
     copyText(toTSV(rows.slice(1)));
   });
 
   // remise + vérif caisse
-  $("btn-remise").addEventListener("click", openRemise);
-  $("btn-depot").addEventListener("click", openDepot);
-  $("dp-close").addEventListener("click", () => { $("depotModal").hidden = true; });
-  $("dp-save").addEventListener("click", doDepot);
-  $("rm-close").addEventListener("click", () => { $("remiseModal").hidden = true; });
-  $("rm-save").addEventListener("click", doRemise);
-  $("rm-chq-list").addEventListener("change", updateRemiseChqSum);
-  $("rm-esp").addEventListener("input", () => {
+  on("btn-remise", "click", openRemise);
+  on("btn-depot", "click", openDepot);
+  on("dp-close", "click", () => { $("depotModal").hidden = true; });
+  on("dp-save", "click", doDepot);
+  on("rm-close", "click", () => { $("remiseModal").hidden = true; });
+  on("rm-save", "click", doRemise);
+  on("rm-chq-list", "change", updateRemiseChqSum);
+  on("rm-esp", "input", () => {
     const v = parseAmt($("rm-esp").value); const t = computeTotals();
     const w = $("rm-esp-warn");
     if (!isNaN(v) && v > t.soldeEspeces + 0.005){ w.textContent = "⚠ Supérieur aux espèces en caisse (" + money(t.soldeEspeces) + ")"; w.hidden = false; }
     else w.hidden = true;
   });
-  $("btn-check").addEventListener("click", openCheck);
-  $("ck-close").addEventListener("click", () => { $("checkModal").hidden = true; });
-  $("btn-suivi").addEventListener("click", openSuivi);
-  $("btn-hist").addEventListener("click", openHist);
-  $("hi-close").addEventListener("click", () => { $("histModal").hidden = true; });
-  ["hi-from", "hi-to", "hi-type", "hi-photo"].forEach(id => $(id).addEventListener("change", renderHist));
-  $("hi-list").addEventListener("click", ev => {
+  on("btn-check", "click", openCheck);
+  on("ck-close", "click", () => { $("checkModal").hidden = true; });
+  on("btn-suivi", "click", openSuivi);
+  on("btn-hist", "click", openHist);
+  on("hi-close", "click", () => { $("histModal").hidden = true; });
+  ["hi-from", "hi-to", "hi-type", "hi-photo"].forEach(id => on(id, "change", renderHist));
+  on("hi-list", "click", ev => {
     const ph = ev.target.closest(".tk-photo"); if (!ph) return;
     const e = state.entries.find(x => x.id === ph.dataset.photo); if (e) openPhotos(e);
   });
-  $("sv-close").addEventListener("click", () => { $("suiviModal").hidden = true; });
-  $("suivi-body").addEventListener("click", ev => {
+  on("sv-close", "click", () => { $("suiviModal").hidden = true; });
+  on("suivi-body", "click", ev => {
     const z = ev.target.closest(".sv-zbtn"); if (z){ openZ(z.dataset.key); return; }
     const cl = ev.target.closest(".sv-clbtn"); if (cl){ openRetro(cl.dataset.key); }
   });
-  $("rt-close").addEventListener("click", () => { $("retroModal").hidden = true; });
-  $("rt-save").addEventListener("click", doRetro);
-  $("rt-esp").addEventListener("input", updateRetroEcart);
-  $("rt-chq").addEventListener("input", updateRetroEcart);
-  $("z-close").addEventListener("click", () => { $("zModal").hidden = true; });
-  $("z-print-btn").addEventListener("click", printZ);
-  $("cl-done").addEventListener("click", ev => { if (ev.target.closest("#cl-z")) openZ(todayKey()); });
-  $("btn-param").addEventListener("click", openParam);
-  $("pm-close").addEventListener("click", () => { $("paramModal").hidden = true; });
-  $("pm-gen").addEventListener("click", () => { $("pm-pwd").value = genPwd(); });
-  $("pm-create").addEventListener("click", doCreateUser);
-  $("pm-list").addEventListener("click", ev => {
+  on("rt-close", "click", () => { $("retroModal").hidden = true; });
+  on("rt-save", "click", doRetro);
+  on("rt-esp", "input", updateRetroEcart);
+  on("rt-chq", "input", updateRetroEcart);
+  on("z-close", "click", () => { $("zModal").hidden = true; });
+  on("z-print-btn", "click", printZ);
+  on("cl-done", "click", ev => { if (ev.target.closest("#cl-z")) openZ(todayKey()); });
+  on("btn-param", "click", openParam);
+  on("pm-close", "click", () => { $("paramModal").hidden = true; });
+  on("pm-gen", "click", () => { $("pm-pwd").value = genPwd(); });
+  on("pm-create", "click", doCreateUser);
+  on("pm-list", "click", ev => {
     const b = ev.target.closest(".pm-b"); if (!b) return;
     const card = b.closest(".pm-u"); if (card) userAction(b.dataset.act, card);
   });
-  $("ck-done").addEventListener("click", () => { $("checkModal").hidden = true; });
-  $("btn-reset").addEventListener("click", doReset);
+  on("ck-done", "click", () => { $("checkModal").hidden = true; });
+  on("btn-reset", "click", doReset);
 
   // photo du paiement
-  $("photo-cam").addEventListener("change", e => onPhotoPick(e.target.files));
-  $("photo-file").addEventListener("change", e => onPhotoPick(e.target.files));
-  $("photo-strip").addEventListener("click", ev => {
+  on("photo-cam", "change", e => onPhotoPick(e.target.files));
+  on("photo-file", "change", e => onPhotoPick(e.target.files));
+  on("photo-strip", "click", ev => {
     const b = ev.target.closest(".photo-rm"); if (!b) return;
     pendingPhotos.splice(parseInt(b.dataset.idx, 10), 1);
     renderPhotoStrip();
   });
-  $("ph-close").addEventListener("click", () => { $("photoModal").hidden = true; $("ph-view").innerHTML = ""; });
+  on("ph-close", "click", () => { $("photoModal").hidden = true; $("ph-view").innerHTML = ""; });
 
-  $("list").addEventListener("click", async ev => {
+  on("list", "click", async ev => {
     const ph = ev.target.closest("[data-photo]");
     if (ph){ const e = state.entries.find(x => x.id === ph.dataset.photo); if (e) openPhotos(e); return; }
     const b = ev.target.closest("[data-fix]"); if (!b) return;
@@ -1061,13 +1063,13 @@ function wireUI(){
   });
 
   // auth
-  $("lg-btn").addEventListener("click", doLogin);
-  $("lg-pwd").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
-  $("lg-forgot").addEventListener("click", doForgot);
-  $("signout").addEventListener("click", async () => { try { localStorage.removeItem(LOGIN_KEY); } catch (e) {} sessionEnding = false; if (sb) await auth.signOut(sb); });
-  $("account").addEventListener("click", () => openSetPwd("account"));
-  $("sp-btn").addEventListener("click", doSetPwd);
-  $("sp-cancel").addEventListener("click", closeSetPwd);
+  on("lg-btn", "click", doLogin);
+  on("lg-pwd", "keydown", e => { if (e.key === "Enter") doLogin(); });
+  on("lg-forgot", "click", doForgot);
+  on("signout", "click", async () => { try { localStorage.removeItem(LOGIN_KEY); } catch (e) {} sessionEnding = false; if (sb) await auth.signOut(sb); });
+  on("account", "click", () => openSetPwd("account"));
+  on("sp-btn", "click", doSetPwd);
+  on("sp-cancel", "click", closeSetPwd);
 }
 
 // ───────── modes ─────────
