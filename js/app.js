@@ -152,9 +152,10 @@ function resizePhoto(file, cb){
   };
   fr.readAsDataURL(file);
 }
+function resetPhotoInputs(){ ["photo-cam", "photo-file"].forEach(id => { const el = $(id); if (el) el.value = ""; }); }
 function clearPhotos(){
   pendingPhotos = [];
-  $("photo-file").value = "";
+  resetPhotoInputs();
   renderPhotoStrip();
 }
 function renderPhotoStrip(){
@@ -174,7 +175,7 @@ function onPhotoPick(files){
     if (res) pendingPhotos.push(res);
     if (--remaining === 0) renderPhotoStrip();
   }));
-  $("photo-file").value = "";  // permet de re-choisir les mêmes fichiers
+  resetPhotoInputs();  // permet de re-choisir les mêmes fichiers
 }
 
 // Sources de photos d'une entrée (compat ancien champ unique)
@@ -1038,9 +1039,7 @@ function wireUI(){
   $("btn-reset").addEventListener("click", doReset);
 
   // photo du paiement
-  $("photo-cam-btn").addEventListener("click", () => $("photo-cam").click());
   $("photo-cam").addEventListener("change", e => onPhotoPick(e.target.files));
-  $("photo-add").addEventListener("click", () => $("photo-file").click());
   $("photo-file").addEventListener("change", e => onPhotoPick(e.target.files));
   $("photo-strip").addEventListener("click", ev => {
     const b = ev.target.closest(".photo-rm"); if (!b) return;

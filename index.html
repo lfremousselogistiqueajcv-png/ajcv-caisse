@@ -141,10 +141,10 @@
 
       <div class="lbl-row">Photos (factures / justificatifs) <span style="color:var(--muted)">(facultatif — plusieurs possibles)</span></div>
       <div class="photo-pick">
-        <input id="photo-cam" type="file" accept="image/*" capture="environment" hidden>
-        <input id="photo-file" type="file" accept="image/*" multiple hidden>
-        <button type="button" class="photo-btn" id="photo-cam-btn">📷 Prendre une photo</button>
-        <button type="button" class="photo-btn" id="photo-add">🖼️ Depuis la galerie</button>
+        <input id="photo-cam" class="photo-input" type="file" accept="image/*" capture="environment">
+        <input id="photo-file" class="photo-input" type="file" accept="image/*" multiple>
+        <label class="photo-btn" for="photo-cam">📷 Prendre une photo</label>
+        <label class="photo-btn" for="photo-file">🖼️ Depuis la galerie</label>
         <div class="photo-strip" id="photo-strip" hidden></div>
       </div>
 
@@ -212,7 +212,7 @@
     <div id="cl-done" class="cl-done" hidden></div>
   </section>
 
-  <footer class="build">AJCV Caisse · v2.9</footer>
+  <footer class="build">AJCV Caisse · v3.0</footer>
 
 </div>
 

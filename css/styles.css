@@ -467,3 +467,7 @@ input[readonly]{background:var(--surface); color:var(--muted); cursor:not-allowe
 /* visionneuse : empile les photos et défile */
 .photo-view{flex-direction:column; gap:12px; align-items:stretch; max-height:74vh; overflow:auto; -webkit-overflow-scrolling:touch}
 .photo-view img{max-height:none; width:100%; object-fit:contain}
+
+/* ===== v3.0 : ouverture native via label (champ masqué mais présent) ===== */
+.photo-input{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; opacity:0}
+label.photo-btn{display:inline-flex; align-items:center}
