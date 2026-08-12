@@ -1,19 +1,13 @@
-// MODÈLE — copie ce fichier en js/config.js et renseigne tes identifiants.
-// Configuration de l'appli.
-//
-// Par défaut : USE_SUPABASE = false -> stockage local (cet appareil), fonctionne hors-ligne.
-//
-// Pour activer le journal partagé Supabase :
-//   1. Crée un projet sur https://supabase.com
-//   2. Exécute supabase/schema.sql dans l'éditeur SQL du projet
-//   3. Récupère l'URL et la clé "anon public" : Settings ▸ API
-//   4. Renseigne-les ci-dessous et passe USE_SUPABASE à true
-//
-// La clé "anon public" est conçue pour être publique (la sécurité repose sur les
-// règles RLS définies dans schema.sql). Ne mets JAMAIS la clé "service_role" ici.
+// MODÈLE — copie en js/config.js et renseigne les valeurs de TON entité.
+// AJCV Caisse — configuration de l'entité
+// ENTITY_NAME  : nom affiché (en-tête, titre, pied de page)
+// ENTITY_COLOR : couleur d'accent (hex) pour distinguer chaque entité (facultatif)
 
 export const CONFIG = {
-  USE_SUPABASE: false,
-  SUPABASE_URL: "https://YOUR-PROJECT.supabase.co",
-  SUPABASE_ANON_KEY: "YOUR-ANON-PUBLIC-KEY"
+  ENTITY_NAME: "NOM-ENTITE",
+  ENTITY_COLOR: "",   // ex. "#2E7D5B" — vide = doré par défaut
+
+  USE_SUPABASE: true,
+  SUPABASE_URL: "https://TON-PROJET.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_TA-CLE"
 };

@@ -471,3 +471,11 @@ input[readonly]{background:var(--surface); color:var(--muted); cursor:not-allowe
 /* ===== v3.0 : ouverture native via label (champ masqué mais présent) ===== */
 .photo-input{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; opacity:0}
 label.photo-btn{display:inline-flex; align-items:center}
+
+/* ===== v3.4 : export PDF des factures ===== */
+.mh-actions{display:flex; align-items:center; gap:8px}
+.pdf-btn{font:inherit; font-size:12px; font-weight:700; padding:7px 12px; border-radius:9px; border:1px solid var(--ink); background:#fff; color:var(--ink); cursor:pointer; white-space:nowrap}
+.pdf-btn:hover{background:var(--ink); color:#fff}
+.pdf-btn:disabled{opacity:.6; cursor:wait}
+.hi-bar{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px}
+.hi-bar .hi-sum{margin-bottom:0}

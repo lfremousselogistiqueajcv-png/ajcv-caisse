@@ -185,7 +185,108 @@ function entryPhotoData(e){ return (e.photos && e.photos.length) ? e.photos : (e
 function entryPhotoPaths(e){ return (e.photoPaths && e.photoPaths.length) ? e.photoPaths : (e.photoPath ? [e.photoPath] : []); }
 function entryHasPhoto(e){ return entryPhotoData(e).length > 0 || entryPhotoPaths(e).length > 0; }
 
+let lastPhotoEntry = null;
+
+// ───────── export PDF des factures (généré dans le navigateur) ─────────
+let _jsPDF = null;
+async function loadJsPDF(){
+  if (_jsPDF) return _jsPDF;
+  const m = await import("https://esm.sh/jspdf@2.5.2");
+  _jsPDF = m.jsPDF || (m.default && m.default.jsPDF) || m.default;
+  return _jsPDF;
+}
+async function urlToDataUrl(url){
+  if (/^data:/.test(url)) return url;
+  const r = await fetch(url); const b = await r.blob();
+  return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
+}
+function imgSize(dataUrl){
+  return new Promise(res => { const im = new Image(); im.onload = () => res({ w: im.width, h: im.height }); im.onerror = () => res({ w: 0, h: 0 }); im.src = dataUrl; });
+}
+async function entryPhotoUrls(e){
+  let urls = entryPhotoData(e).slice();
+  if (!urls.length){
+    for (const p of entryPhotoPaths(e)){ try { urls.push(await photoUrl(p)); } catch (err) {} }
+  }
+  return urls;
+}
+function pdfHeader(doc, e, pageW){
+  const name = (CONFIG.ENTITY_NAME || "AJCV");
+  doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+  doc.text(name + " — Justificatif de caisse", pageW / 2, 14, { align: "center" });
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+  const l1 = TYPES[e.typeKey].label + " · " + num2(e.montant) + " € · " + (e.mode || "");
+  const who = ((e.nom || "") + " " + (e.prenom || "")).trim();
+  const l2 = [e.date + " " + (e.heure || ""), e.ndoc ? ("pièce " + e.ndoc) : "", who, e.nchq ? ("chèque n° " + e.nchq) : ""].filter(Boolean).join("  ·  ");
+  doc.text(l1, pageW / 2, 20, { align: "center" });
+  doc.setFontSize(9); doc.setTextColor(110);
+  doc.text(l2, pageW / 2, 25, { align: "center" });
+  doc.setTextColor(0);
+}
+async function addEntryPages(doc, e, first){
+  const urls = await entryPhotoUrls(e);
+  const pageW = 210, pageH = 297, margin = 10, top = 32;
+  let added = 0;
+  for (const u of urls){
+    let du; try { du = await urlToDataUrl(u); } catch (err) { continue; }
+    const s = await imgSize(du); if (!s.w) continue;
+    if (!first || added > 0) doc.addPage();
+    pdfHeader(doc, e, pageW);
+    const maxW = pageW - 2 * margin, maxH = pageH - top - margin;
+    const k = Math.min(maxW / s.w, maxH / s.h);
+    const w = s.w * k, h = s.h * k;
+    doc.addImage(du, "JPEG", (pageW - w) / 2, top, w, h);
+    added++; first = false;
+  }
+  return added;
+}
+async function pdfEntry(){
+  const e = lastPhotoEntry; if (!e) return;
+  const btn = $("ph-pdf"), label = btn.textContent; btn.disabled = true; btn.textContent = "…";
+  try {
+    const JsPDF = await loadJsPDF();
+    const doc = new JsPDF({ unit: "mm", format: "a4" });
+    const n = await addEntryPages(doc, e, true);
+    if (!n){ toast("Aucune photo exploitable"); return; }
+    doc.save("facture_" + p3(e.seq) + "_" + e.dateKey + ".pdf");
+  } catch (err) { console.error(err); toast("Génération PDF impossible — vérifie la connexion"); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+function histFiltered(){
+  const from = $("hi-from").value, to = $("hi-to").value, tf = $("hi-type").value, photoOnly = $("hi-photo").checked;
+  let items = state.entries.slice();
+  if (from) items = items.filter(e => e.dateKey >= from);
+  if (to) items = items.filter(e => e.dateKey <= to);
+  if (tf !== "all") items = items.filter(e => e.typeKey === tf);
+  if (photoOnly) items = items.filter(e => entryHasPhoto(e));
+  return items;
+}
+async function pdfPeriod(){
+  const items = histFiltered().filter(e => entryHasPhoto(e)).sort((a, b) => (a.dateKey + p3(a.seq)).localeCompare(b.dateKey + p3(b.seq)));
+  if (!items.length){ toast("Aucune facture (photo) dans la sélection"); return; }
+  const btn = $("hi-pdf"), label = btn.textContent; btn.disabled = true; btn.textContent = "Génération…";
+  try {
+    const JsPDF = await loadJsPDF();
+    const doc = new JsPDF({ unit: "mm", format: "a4" });
+    // page de garde
+    const name = (CONFIG.ENTITY_NAME || "AJCV");
+    const from = $("hi-from").value ? frDate(new Date($("hi-from").value + "T00:00:00")) : "début";
+    const to = $("hi-to").value ? frDate(new Date($("hi-to").value + "T00:00:00")) : "aujourd'hui";
+    doc.setFont("helvetica", "bold"); doc.setFontSize(18);
+    doc.text(name + " — Factures de caisse", 105, 120, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(12);
+    doc.text("Période : " + from + " → " + to, 105, 132, { align: "center" });
+    doc.text(items.length + " opération(s) avec justificatif", 105, 140, { align: "center" });
+    let total = 0;
+    for (const e of items){ doc.addPage(); await addEntryPages(doc, e, true); total++; btn.textContent = "Génération… " + total + "/" + items.length; }
+    doc.save("factures_" + ($("hi-from").value || "debut") + "_" + ($("hi-to").value || "fin") + ".pdf");
+    toast("PDF généré (" + items.length + " opération(s))");
+  } catch (err) { console.error(err); toast("Génération PDF impossible — vérifie la connexion"); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+
 async function openPhotos(entry){
+  lastPhotoEntry = entry;
   const view = $("ph-view");
   view.innerHTML = '<div class="ph-load">Chargement…</div>';
   $("photoModal").hidden = false;
@@ -615,12 +716,7 @@ function openHist(){
   $("histModal").hidden = false;
 }
 function renderHist(){
-  const from = $("hi-from").value, to = $("hi-to").value, tf = $("hi-type").value, photoOnly = $("hi-photo").checked;
-  let items = state.entries.slice();
-  if (from) items = items.filter(e => e.dateKey >= from);
-  if (to) items = items.filter(e => e.dateKey <= to);
-  if (tf !== "all") items = items.filter(e => e.typeKey === tf);
-  if (photoOnly) items = items.filter(e => e.photo || e.photoPath);
+  const items = histFiltered();
   let inn = 0, out = 0;
   items.forEach(e => { const s = e.sens * e.montant; if (s > 0) inn += s; else out += -s; });
   $("hi-sum").textContent = items.length + " opération(s) · encaissé " + money(inn) + " · décaissé " + money(out);
@@ -1012,6 +1108,8 @@ function wireUI(){
   on("btn-suivi", "click", openSuivi);
   on("btn-hist", "click", openHist);
   on("hi-close", "click", () => { $("histModal").hidden = true; });
+  on("ph-pdf", "click", pdfEntry);
+  on("hi-pdf", "click", pdfPeriod);
   ["hi-from", "hi-to", "hi-type", "hi-photo"].forEach(id => on(id, "change", renderHist));
   on("hi-list", "click", ev => {
     const ph = ev.target.closest(".tk-photo"); if (!ph) return;
@@ -1152,33 +1250,55 @@ async function doLogin(){
 }
 
 async function startSupabase(){
-  let createClient;
+  // quoi qu'il arrive, l'appli devient visible (jamais d'écran vide)
+  const reveal = () => { try { $("appwrap").style.visibility = "visible"; } catch (e) {} };
+  const guard = setTimeout(() => { reveal(); banner("Connexion à la base lente… vérifie le réseau ou le projet Supabase (peut-être en pause)."); }, 8000);
   try {
-    ({ createClient } = await import("https://esm.sh/@supabase/supabase-js@2"));
+    let createClient;
+    try {
+      ({ createClient } = await import("https://esm.sh/@supabase/supabase-js@2"));
+    } catch (e) {
+      clearTimeout(guard); reveal();
+      banner("Supabase indisponible — bascule en mode local (cet appareil).");
+      return startLocal();
+    }
+    sb = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    const { createSupabaseStore } = await import("./storage.supabase.js");
+    useAdapter(createSupabaseStore(sb));
+
+    const isRecovery = location.hash.indexOf("type=recovery") !== -1;
+
+    auth.onAuthChange(sb, (event, s) => {
+      if (event === "PASSWORD_RECOVERY"){ openSetPwd("recovery"); return; }
+      if (isRecovery) return;       // pendant une récupération, on ignore les autres événements
+      Promise.resolve(handleSession(s)).catch(e => console.error(e));
+    });
+
+    if (isRecovery) openSetPwd("recovery");
+    else await handleSession(await auth.getSession(sb));
   } catch (e) {
-    banner("Supabase indisponible — bascule en mode local (cet appareil).");
-    return startLocal();
+    console.error(e);
+    banner("Base injoignable. Si le projet Supabase est en pause (offre gratuite), ouvre son tableau de bord et clique « Restore project », puis recharge.");
+    $("login").hidden = false;
+  } finally {
+    clearTimeout(guard); reveal();
   }
-  sb = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-  const { createSupabaseStore } = await import("./storage.supabase.js");
-  useAdapter(createSupabaseStore(sb));
-
-  const isRecovery = location.hash.indexOf("type=recovery") !== -1;
-
-  auth.onAuthChange(sb, (event, s) => {
-    if (event === "PASSWORD_RECOVERY"){ openSetPwd("recovery"); return; }
-    if (isRecovery) return;       // pendant une récupération, on ignore les autres événements
-    handleSession(s);
-  });
-
-  if (isRecovery) openSetPwd("recovery");
-  else await handleSession(await auth.getSession(sb));
-
-  $("appwrap").style.visibility = "visible";
 }
 
 // ───────── init ─────────
+function applyEntity(){
+  const name = (CONFIG.ENTITY_NAME || "AJCV").trim();
+  const color = (CONFIG.ENTITY_COLOR || "").trim();
+  document.querySelectorAll(".ent-name").forEach(el => { el.textContent = name; });
+  document.title = name + " · Caisse";
+  if (color){
+    document.documentElement.style.setProperty("--brass", color);
+    document.documentElement.style.setProperty("--brass-soft", color + "22");
+  }
+}
+
 async function init(){
+  applyEntity();
   if (supabaseConfigured()) $("appwrap").style.visibility = "hidden";
   onChange(renderAll);
   wireUI();

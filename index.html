@@ -13,14 +13,14 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Caisse">
-<link rel="stylesheet" href="css/styles.css?v=31">
+<link rel="stylesheet" href="css/styles.css?v=34">
 </head>
 <body>
 
 <!-- ÉCRAN DE CONNEXION (mode Supabase) -->
 <div class="login-overlay" id="login" hidden>
   <div class="login-card">
-    <div class="brand"><span class="dot"></span><div>AJCV<small>Caisse</small></div></div>
+    <div class="brand"><span class="dot"></span><div><span class="ent-name">AJCV</span><small>Caisse</small></div></div>
     <h1>Connexion</h1>
     <div class="inp"><label for="lg-email">E-mail</label><input id="lg-email" type="email" autocomplete="username" placeholder="prenom@ajcv.re"></div>
     <div class="inp"><label for="lg-pwd">Mot de passe</label><input id="lg-pwd" type="password" autocomplete="current-password" placeholder="••••••••"></div>
@@ -34,7 +34,7 @@
 <!-- DÉFINIR / CHANGER LE MOT DE PASSE (récupération + paramètres compte) -->
 <div class="login-overlay" id="setpwd" hidden>
   <div class="login-card">
-    <div class="brand"><span class="dot"></span><div>AJCV<small>Caisse</small></div></div>
+    <div class="brand"><span class="dot"></span><div><span class="ent-name">AJCV</span><small>Caisse</small></div></div>
     <h1 id="sp-title">Nouveau mot de passe</h1>
     <div class="inp"><label for="sp-pwd">Nouveau mot de passe</label><input id="sp-pwd" type="password" autocomplete="new-password" placeholder="••••••••"></div>
     <div class="inp"><label for="sp-pwd2">Confirmer</label><input id="sp-pwd2" type="password" autocomplete="new-password" placeholder="••••••••"></div>
@@ -48,7 +48,7 @@
 <div class="wrap" id="appwrap">
 
   <header class="appbar">
-    <div class="brand"><span class="dot"></span><div>AJCV<small>Caisse · saisie</small></div></div>
+    <div class="brand"><span class="dot"></span><div><span class="ent-name">AJCV</span><small>Caisse · saisie</small></div></div>
     <div class="appbar-right">
       <div class="clock"><b id="ck-time">--:--</b><span id="ck-date">—</span></div>
       <div class="userbox" id="userbox" hidden>
@@ -212,7 +212,7 @@
     <div id="cl-done" class="cl-done" hidden></div>
   </section>
 
-  <footer class="build">AJCV Caisse · v3.1</footer>
+  <footer class="build"><span class="ent-name">AJCV</span> Caisse · v3.4</footer>
 
 </div>
 
@@ -275,7 +275,7 @@
 <!-- VISIONNEUSE PHOTO -->
 <div class="modal-overlay" id="photoModal" hidden>
   <div class="modal-card photo-modal">
-    <div class="modal-h"><h2>Photos / factures</h2><button type="button" class="modal-x" id="ph-close" aria-label="Fermer">✕</button></div>
+    <div class="modal-h"><h2>Photos / factures</h2><div class="mh-actions"><button type="button" class="pdf-btn" id="ph-pdf">⬇ PDF</button><button type="button" class="modal-x" id="ph-close" aria-label="Fermer">✕</button></div></div>
     <div class="photo-view" id="ph-view"></div>
   </div>
 </div>
@@ -312,7 +312,7 @@
         <label class="hi-chk"><input type="checkbox" id="hi-photo"> Avec facture (photo)</label>
       </div>
     </div>
-    <div class="hi-sum" id="hi-sum"></div>
+    <div class="hi-bar"><div class="hi-sum" id="hi-sum"></div><button type="button" class="pdf-btn" id="hi-pdf">⬇ PDF factures</button></div>
     <div class="hi-list" id="hi-list"></div>
   </div>
 </div>
@@ -370,6 +370,6 @@
 
 <div class="toast" id="toast"></div>
 
-<script type="module" src="js/app.js?v=31"></script>
+<script type="module" src="js/app.js?v=34"></script>
 </body>
 </html>
