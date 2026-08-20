@@ -1,7 +1,7 @@
 {
-  "name": "AJCV Caisse",
-  "short_name": "Caisse",
-  "description": "Caisse AJCV — saisie, journal, clôture.",
+  "name": "Caisse Holding Chevalier",
+  "short_name": "Caisse HC",
+  "description": "Caisse Holding Chevalier — caisse multi-entités",
   "lang": "fr",
   "start_url": ".",
   "scope": ".",

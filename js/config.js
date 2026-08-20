@@ -3,7 +3,7 @@
 // ENTITY_COLOR : couleur d'accent (hex) pour distinguer chaque entité (facultatif)
 
 export const CONFIG = {
-  ENTITY_NAME: "AJCV",
+  ENTITY_NAME: "Holding Chevalier",
   ENTITY_COLOR: "",   // ex. "#2E7D5B" — vide = doré par défaut
 
   USE_SUPABASE: true,

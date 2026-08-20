@@ -211,7 +211,7 @@ async function entryPhotoUrls(e){
   return urls;
 }
 function pdfHeader(doc, e, pageW){
-  const name = (CONFIG.ENTITY_NAME || "AJCV");
+  const name = ((entiteCourante && entiteCourante.nom) || CONFIG.ENTITY_NAME || "Holding Chevalier");
   doc.setFont("helvetica", "bold"); doc.setFontSize(13);
   doc.text(name + " — Justificatif de caisse", pageW / 2, 14, { align: "center" });
   doc.setFont("helvetica", "normal"); doc.setFontSize(10);
@@ -1394,7 +1394,7 @@ function applyEntity(ent){
   const name = ((ent && ent.nom) || CONFIG.ENTITY_NAME || "AJCV").trim();
   const color = ((ent && ent.couleur) || CONFIG.ENTITY_COLOR || "").trim();
   document.querySelectorAll(".ent-name").forEach(el => { el.textContent = name; });
-  document.title = name + " · Caisse";
+  document.title = ((ent && ent.nom) ? ent.nom + " — " : "") + "Caisse Holding Chevalier";
   if (color){
     document.documentElement.style.setProperty("--brass", color);
     document.documentElement.style.setProperty("--brass-soft", color + "22");
