@@ -735,7 +735,7 @@ function renderHist(){
   }).join("");
 }
 
-// ───────── Paramètres : utilisateurs (admin, via la fonction serveur) ─────────
+// ───────── Paramètres : utilisateurs & entités (admin, via la fonction serveur) ─────────
 function pmMsg(text, bad){
   const el = $("pm-msg");
   if (!text){ el.hidden = true; el.textContent = ""; el.className = "pm-msg"; return; }
@@ -753,10 +753,12 @@ async function adminCall(action, payload){
   const token = session && session.access_token;
   if (!token) throw new Error("Session expirée, reconnecte-toi");
   const url = CONFIG.SUPABASE_URL.replace(/\/+$/, "") + "/functions/v1/admin-users";
+  const body = Object.assign({ action }, payload || {});
+  if (!body.entite_id && entiteCourante) body.entite_id = entiteCourante.id;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "apikey": CONFIG.SUPABASE_ANON_KEY, "Authorization": "Bearer " + token },
-    body: JSON.stringify(Object.assign({ action }, payload || {}))
+    body: JSON.stringify(body)
   });
   let j = {}; try { j = await res.json(); } catch (e) {}
   if (!res.ok) throw new Error(j.error || ("Erreur " + res.status));
@@ -764,7 +766,7 @@ async function adminCall(action, payload){
 }
 function roleBadge(role){ return '<span class="pm-role ' + (role === "admin" ? "adm" : "cai") + '">' + (role === "admin" ? "Admin" : "Caissier") + "</span>"; }
 function renderUsers(users){
-  if (!users || !users.length){ $("pm-list").innerHTML = '<div class="pm-loading">Aucun utilisateur.</div>'; return; }
+  if (!users || !users.length){ $("pm-list").innerHTML = '<div class="pm-loading">Aucun utilisateur dans cette entité.</div>'; return; }
   $("pm-list").innerHTML = users.map(u => {
     const last = u.last_sign_in_at ? frDate(new Date(u.last_sign_in_at)) : "jamais";
     return '<div class="pm-u" data-id="' + u.id + '" data-email="' + esc(u.email) + '" data-role="' + u.role + '">' +
@@ -775,7 +777,8 @@ function renderUsers(users){
         '<button type="button" class="pm-b" data-act="role">' + (u.role === "admin" ? "Passer caissier" : "Passer admin") + "</button>" +
         '<button type="button" class="pm-b" data-act="pwd">Mot de passe</button>' +
         '<button type="button" class="pm-b" data-act="mail">Mail reset</button>' +
-        '<button type="button" class="pm-b danger" data-act="del">Supprimer</button>' +
+        '<button type="button" class="pm-b" data-act="detach">Retirer de l\'entité</button>' +
+        '<button type="button" class="pm-b danger" data-act="del">Supprimer le compte</button>' +
       "</div></div>";
   }).join("");
 }
@@ -786,7 +789,10 @@ async function loadUsers(){
 }
 async function openParam(){
   pmMsg("");
+  $("pm-title").textContent = "Paramètres — " + (entiteCourante ? entiteCourante.nom : "utilisateurs");
   $("pm-email").value = ""; $("pm-name").value = ""; $("pm-role").value = "caissier"; $("pm-pwd").value = genPwd();
+  $("pm-att-email").value = ""; $("pm-att-role").value = "caissier";
+  $("pm-ent-nom").value = ""; $("pm-ent-code").value = ""; $("pm-ent-coul").value = "";
   $("paramModal").hidden = false;
   await loadUsers();
 }
@@ -799,20 +805,54 @@ async function doCreateUser(){
   const btn = $("pm-create"), label = btn.textContent; btn.disabled = true; btn.textContent = "Création…";
   try {
     await adminCall("create", { email, password, display_name, role });
-    pmMsg("Compte créé : " + email + " · mot de passe : " + password);
+    pmMsg("Compte créé et rattaché : " + email + " · mot de passe : " + password);
     $("pm-email").value = ""; $("pm-name").value = ""; $("pm-pwd").value = genPwd();
     await loadUsers();
   } catch (e) { pmMsg(e.message, true); }
   finally { btn.disabled = false; btn.textContent = label; }
 }
+async function doAttach(){
+  const email = $("pm-att-email").value.trim();
+  const role = $("pm-att-role").value;
+  if (!email){ pmMsg("Indique l'email du compte à rattacher", true); return; }
+  const btn = $("pm-attach"), label = btn.textContent; btn.disabled = true; btn.textContent = "…";
+  try {
+    await adminCall("addMember", { email, role });
+    pmMsg("Compte rattaché à " + (entiteCourante ? entiteCourante.nom : "l'entité") + " : " + email);
+    $("pm-att-email").value = "";
+    await loadUsers();
+  } catch (e) { pmMsg(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+async function doCreateEntite(){
+  const nom = $("pm-ent-nom").value.trim();
+  const code = $("pm-ent-code").value.trim();
+  const couleur = $("pm-ent-coul").value.trim();
+  if (!nom || !code){ pmMsg("Nom et code requis pour l'entité", true); return; }
+  const btn = $("pm-ent-create"), label = btn.textContent; btn.disabled = true; btn.textContent = "Création…";
+  try {
+    await adminCall("createEntity", { nom, code, couleur });
+    pmMsg("Entité créée : " + nom + ". Tu y es admin.");
+    $("pm-ent-nom").value = ""; $("pm-ent-code").value = ""; $("pm-ent-coul").value = "";
+    if (currentUid){
+      try {
+        entites = await loadMemberships(currentUid);
+        $("ent-switch").hidden = entites.length < 2;
+      } catch (e) {}
+    }
+    toast("Bascule via « Changer d'entité » pour l'ouvrir");
+  } catch (e) { pmMsg(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
 async function userAction(act, card){
   const id = card.dataset.id, email = card.dataset.email, role = card.dataset.role;
+  const entNom = entiteCourante ? entiteCourante.nom : "cette entité";
   try {
     if (act === "role"){
       const next = role === "admin" ? "caissier" : "admin";
-      if (!window.confirm("Changer le rôle de " + email + " en « " + next + " » ?")) return;
+      if (!window.confirm("Changer le rôle de " + email + " dans " + entNom + " en « " + next + " » ?")) return;
       await adminCall("setRole", { user_id: id, role: next });
-      pmMsg("Rôle mis à jour : " + email + " → " + next);
+      pmMsg("Rôle mis à jour dans " + entNom + " : " + email + " → " + next);
     } else if (act === "pwd"){
       const np = window.prompt("Nouveau mot de passe temporaire pour " + email + " :", genPwd());
       if (!np) return;
@@ -822,8 +862,13 @@ async function userAction(act, card){
       if (!window.confirm("Envoyer un mail de réinitialisation à " + email + " ?")) return;
       await adminCall("resetEmail", { email, redirect_to: location.origin + location.pathname });
       pmMsg("Mail de réinitialisation envoyé à " + email);
+    } else if (act === "detach"){
+      if (!window.confirm("Retirer " + email + " de " + entNom + " ?\nIl n'aura plus accès à cette caisse (son compte et ses autres entités restent intacts).")) return;
+      await adminCall("removeMember", { user_id: id });
+      pmMsg("Retiré de " + entNom + " : " + email);
     } else if (act === "del"){
-      if (!window.confirm("Supprimer définitivement le compte " + email + " ?\nCette action est irréversible.")) return;
+      if (!window.confirm("Supprimer DÉFINITIVEMENT le compte " + email + " (toutes entités) ?")) return;
+      if (!window.confirm("Dernière confirmation : suppression irréversible du compte " + email + ".")) return;
       await adminCall("delete", { user_id: id });
       pmMsg("Compte supprimé : " + email);
     }
@@ -1133,6 +1178,8 @@ function wireUI(){
   on("pm-close", "click", () => { $("paramModal").hidden = true; });
   on("pm-gen", "click", () => { $("pm-pwd").value = genPwd(); });
   on("pm-create", "click", doCreateUser);
+  on("pm-attach", "click", doAttach);
+  on("pm-ent-create", "click", doCreateEntite);
   on("pm-list", "click", ev => {
     const b = ev.target.closest(".pm-b"); if (!b) return;
     const card = b.closest(".pm-u"); if (card) userAction(b.dataset.act, card);

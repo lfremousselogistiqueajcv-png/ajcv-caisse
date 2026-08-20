@@ -13,7 +13,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Caisse">
-<link rel="stylesheet" href="css/styles.css?v=40">
+<link rel="stylesheet" href="css/styles.css?v=41">
 </head>
 <body>
 
@@ -213,7 +213,7 @@
     <div id="cl-done" class="cl-done" hidden></div>
   </section>
 
-  <footer class="build"><span class="ent-name">AJCV</span> Caisse · v4.0</footer>
+  <footer class="build"><span class="ent-name">AJCV</span> Caisse · v4.1</footer>
 
 </div>
 
@@ -338,14 +338,15 @@
   </div>
 </div>
 
-<!-- PARAMÈTRES — GESTION DES UTILISATEURS (admin) -->
+<!-- PARAMÈTRES — UTILISATEURS & ENTITÉS (admin) -->
 <div class="modal-overlay" id="paramModal" hidden>
   <div class="modal-card param-card">
-    <div class="modal-h"><h2>Paramètres — utilisateurs</h2><button type="button" class="modal-x" id="pm-close" aria-label="Fermer">✕</button></div>
+    <div class="modal-h"><h2 id="pm-title">Paramètres</h2><button type="button" class="modal-x" id="pm-close" aria-label="Fermer">✕</button></div>
     <div class="pm-msg" id="pm-msg" hidden></div>
     <div class="pm-list" id="pm-list"><div class="pm-loading">Chargement…</div></div>
+
     <div class="pm-create">
-      <div class="pm-create-t">Créer un utilisateur</div>
+      <div class="pm-create-t">Créer un utilisateur (rattaché à cette entité)</div>
       <input id="pm-email" type="email" inputmode="email" placeholder="Email" autocomplete="off">
       <input id="pm-name" placeholder="Nom affiché" autocomplete="off">
       <div class="pm-row2">
@@ -353,6 +354,26 @@
         <div class="pm-pwd-wrap"><input id="pm-pwd" placeholder="Mot de passe temporaire" autocomplete="off"><button type="button" id="pm-gen" class="pm-gen">Générer</button></div>
       </div>
       <button type="button" class="save" id="pm-create">Créer le compte</button>
+    </div>
+
+    <div class="pm-create">
+      <div class="pm-create-t">Rattacher un compte existant à cette entité</div>
+      <p class="dp-note">Ex. : la comptable, déjà créée ailleurs, à rattacher ici.</p>
+      <div class="pm-row2">
+        <input id="pm-att-email" type="email" inputmode="email" placeholder="Email du compte" autocomplete="off">
+        <select id="pm-att-role"><option value="caissier">Caissier</option><option value="admin">Admin</option></select>
+      </div>
+      <button type="button" class="save" id="pm-attach">Rattacher</button>
+    </div>
+
+    <div class="pm-create">
+      <div class="pm-create-t">Nouvelle entité</div>
+      <input id="pm-ent-nom" placeholder="Nom affiché (ex. Le Zaz)" autocomplete="off">
+      <div class="pm-row2">
+        <input id="pm-ent-code" placeholder="Code court (ex. ZAZ)" autocomplete="off">
+        <input id="pm-ent-coul" placeholder="Couleur hex (ex. #C2334D)" autocomplete="off">
+      </div>
+      <button type="button" class="save" id="pm-ent-create">Créer l'entité</button>
     </div>
   </div>
 </div>
@@ -380,6 +401,6 @@
 
 <div class="toast" id="toast"></div>
 
-<script type="module" src="js/app.js?v=40"></script>
+<script type="module" src="js/app.js?v=41"></script>
 </body>
 </html>
