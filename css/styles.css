@@ -479,3 +479,13 @@ label.photo-btn{display:inline-flex; align-items:center}
 .pdf-btn:disabled{opacity:.6; cursor:wait}
 .hi-bar{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px}
 .hi-bar .hi-sum{margin-bottom:0}
+
+/* ===== v4.0 : multi-entités ===== */
+.ent-card{max-width:min(94vw,420px)}
+.ent-list{display:flex; flex-direction:column; gap:9px; margin-top:6px}
+.ent-choice{display:flex; align-items:center; gap:11px; width:100%; text-align:left; font:inherit; font-size:15px;
+  border:1.5px solid var(--line); border-radius:12px; padding:13px 14px; background:#fff; cursor:pointer}
+.ent-choice:hover{border-color:var(--ink)}
+.ent-dot{width:14px; height:14px; border-radius:50%; flex:none}
+.ent-nm{font-weight:700; color:var(--ink); flex:1}
+.ent-role{font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em}

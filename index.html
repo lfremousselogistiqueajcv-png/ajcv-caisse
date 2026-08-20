@@ -13,7 +13,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Caisse">
-<link rel="stylesheet" href="css/styles.css?v=34">
+<link rel="stylesheet" href="css/styles.css?v=40">
 </head>
 <body>
 
@@ -53,6 +53,7 @@
       <div class="clock"><b id="ck-time">--:--</b><span id="ck-date">—</span></div>
       <div class="userbox" id="userbox" hidden>
         <span class="who"><b id="ub-name">—</b><span id="ub-role" class="role">—</span></span>
+        <button class="signout" id="ent-switch" hidden>Changer d'entité</button>
         <button class="signout" id="account">Mot de passe</button>
         <button class="signout" id="signout">Déconnexion</button>
       </div>
@@ -212,7 +213,7 @@
     <div id="cl-done" class="cl-done" hidden></div>
   </section>
 
-  <footer class="build"><span class="ent-name">AJCV</span> Caisse · v3.4</footer>
+  <footer class="build"><span class="ent-name">AJCV</span> Caisse · v4.0</footer>
 
 </div>
 
@@ -368,8 +369,17 @@
 <!-- zone imprimée (cachée à l'écran) -->
 <div id="zPrint" class="z-print"></div>
 
+<!-- CHOIX DE L'ENTITÉ -->
+<div class="modal-overlay" id="entiteModal" hidden>
+  <div class="modal-card ent-card">
+    <div class="modal-h"><h2>Choisis ton entité</h2></div>
+    <p class="dp-note">Chaque entité a sa propre caisse, ses comptes et son historique.</p>
+    <div class="ent-list" id="ent-list"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
-<script type="module" src="js/app.js?v=34"></script>
+<script type="module" src="js/app.js?v=40"></script>
 </body>
 </html>

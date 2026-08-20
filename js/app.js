@@ -1110,6 +1110,8 @@ function wireUI(){
   on("hi-close", "click", () => { $("histModal").hidden = true; });
   on("ph-pdf", "click", pdfEntry);
   on("hi-pdf", "click", pdfPeriod);
+  on("ent-switch", "click", openEntitePicker);
+  on("ent-list", "click", ev => { const b = ev.target.closest(".ent-choice"); if (b) selectEntite(b.dataset.id, true); });
   ["hi-from", "hi-to", "hi-type", "hi-photo"].forEach(id => on(id, "change", renderHist));
   on("hi-list", "click", ev => {
     const ph = ev.target.closest(".tk-photo"); if (!ph) return;
@@ -1193,6 +1195,48 @@ async function startLocal(){
 
 function roleLabel(r){ return r === "admin" ? "Admin" : "Caissier"; }
 
+// ───────── entités : appartenances + sélection ─────────
+const ENT_KEY = "ajcv_caisse_entite";
+let entites = [];          // [{id, code, nom, couleur, role}]
+let entiteCourante = null;
+
+async function loadMemberships(uid){
+  const { data: mb, error } = await sb.from("membres").select("entite_id, role").eq("user_id", uid);
+  if (error) throw error;
+  if (!mb || !mb.length) return [];
+  const ids = mb.map(m => m.entite_id);
+  const { data: es, error: e2 } = await sb.from("entites").select("*").in("id", ids).eq("actif", true);
+  if (e2) throw e2;
+  const roleById = {}; mb.forEach(m => { roleById[m.entite_id] = m.role; });
+  return (es || []).map(e => ({ id: e.id, code: e.code, nom: e.nom, couleur: e.couleur || "", role: roleById[e.id] || "caissier" }))
+    .sort((a, b) => a.nom.localeCompare(b.nom));
+}
+function renderEntitePicker(){
+  $("ent-list").innerHTML = entites.map(e =>
+    '<button type="button" class="ent-choice" data-id="' + e.id + '">' +
+    '<span class="ent-dot" style="background:' + esc(e.couleur || "#9A7B3F") + '"></span>' +
+    '<span class="ent-nm">' + esc(e.nom) + '</span>' +
+    '<span class="ent-role">' + (e.role === "admin" ? "Admin" : "Caissier") + "</span></button>"
+  ).join("");
+}
+async function selectEntite(id, remember){
+  const e = entites.find(x => x.id === id); if (!e) return;
+  entiteCourante = e;
+  if (remember){ try { localStorage.setItem(ENT_KEY, id); } catch (err) {} }
+  applyEntity(e);
+  setRole(e.role);
+  const rl = $("ub-role"); rl.textContent = roleLabel(e.role);
+  rl.className = "role" + (e.role === "admin" ? " admin" : "");
+  const { createSupabaseStore } = await import("./storage.supabase.js");
+  useAdapter(createSupabaseStore(sb, e.id));
+  applyRoleUI();
+  try { await hydrate(); }
+  catch (err) { console.error(err); banner("Connexion au journal impossible pour « " + e.nom + " »."); }
+  await afterHydrate();
+  $("entiteModal").hidden = true;
+}
+function openEntitePicker(){ renderEntitePicker(); $("entiteModal").hidden = false; }
+
 async function handleSession(session){
   const uid = session && session.user ? session.user.id : null;
   if (uid === currentUid && booted) return;
@@ -1209,21 +1253,34 @@ async function handleSession(session){
   try { if (!localStorage.getItem(LOGIN_KEY)) localStorage.setItem(LOGIN_KEY, "" + Date.now()); } catch (e) {}
 
   const prof = await auth.getProfile(sb, session.user.id);
-  setRole(prof.role);
   setOperateur(prof.display_name || (session.user.email || "").split("@")[0]);
 
   $("ub-name").textContent = state.operateur;
-  const rl = $("ub-role"); rl.textContent = roleLabel(prof.role);
-  rl.className = "role" + (prof.role === "admin" ? " admin" : "");
   $("userbox").hidden = false;
-
   $("oper").value = state.operateur;
   $("oper").readOnly = true;
 
-  applyRoleUI();
-  try { await hydrate(); }
-  catch (e) { console.error(e); banner("Connexion au journal impossible. Vérifie la configuration Supabase."); }
-  await afterHydrate();
+  // appartenances -> sélection d'entité
+  let ms = [];
+  try { ms = await loadMemberships(session.user.id); } catch (e) { console.error(e); }
+  if (ms.length){
+    entites = ms;
+    $("ent-switch").hidden = ms.length < 2;
+    let saved = null; try { saved = localStorage.getItem(ENT_KEY); } catch (e) {}
+    const pre = ms.find(x => x.id === saved);
+    if (ms.length === 1) await selectEntite(ms[0].id, false);
+    else if (pre) await selectEntite(pre.id, false);
+    else { openEntitePicker(); booted = true; return; }
+  } else {
+    // base pas encore migrée (SQL n°1 absent) : mono-entité, comportement historique
+    setRole(prof.role);
+    const rl = $("ub-role"); rl.textContent = roleLabel(prof.role);
+    rl.className = "role" + (prof.role === "admin" ? " admin" : "");
+    applyRoleUI();
+    try { await hydrate(); }
+    catch (e) { console.error(e); banner("Connexion au journal impossible. Vérifie la configuration Supabase."); }
+    await afterHydrate();
+  }
   booted = true;
 }
 
@@ -1286,9 +1343,9 @@ async function startSupabase(){
 }
 
 // ───────── init ─────────
-function applyEntity(){
-  const name = (CONFIG.ENTITY_NAME || "AJCV").trim();
-  const color = (CONFIG.ENTITY_COLOR || "").trim();
+function applyEntity(ent){
+  const name = ((ent && ent.nom) || CONFIG.ENTITY_NAME || "AJCV").trim();
+  const color = ((ent && ent.couleur) || CONFIG.ENTITY_COLOR || "").trim();
   document.querySelectorAll(".ent-name").forEach(el => { el.textContent = name; });
   document.title = name + " · Caisse";
   if (color){

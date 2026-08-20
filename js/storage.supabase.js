@@ -4,10 +4,12 @@
 
 import { frDate } from "./format.js";
 
-export function createSupabaseStore(sb){
+export function createSupabaseStore(sb, entiteId){
+  // entiteId absent = mode historique mono-entité (avant migration multi-entités)
+  const multi = !!entiteId;
   // entrée interne -> ligne BDD (user_id est rempli côté serveur : default auth.uid())
   function toRow(e){
-    return {
+    const row = {
       op_date: e.dateKey, op_time: e.heure, type: e.typeKey, sens: e.sens,
       montant: e.montant, mode: e.mode || null, n_doc: e.ndoc || null,
       nom: e.nom || null, prenom: e.prenom || null,
@@ -15,6 +17,8 @@ export function createSupabaseStore(sb){
       operateur: e.operateur || null, ref_numero: e.refSeq || null,
       photo_path: (e.photoPaths && e.photoPaths.length) ? e.photoPaths.join("\n") : (e.photoPath || null)
     };
+    if (multi) row.entite_id = entiteId;
+    return row;
   }
   function fromRow(r){
     return {
@@ -43,10 +47,12 @@ export function createSupabaseStore(sb){
     isMemory(){ return false; },
 
     async list(){
-      const { data: ops, error } = await sb
-        .from("caisse_operations").select("*").order("numero", { ascending: false }).range(0, 4999);
+      let q = sb.from("caisse_operations").select("*");
+      if (multi) q = q.eq("entite_id", entiteId);
+      const { data: ops, error } = await q.order("numero", { ascending: false }).range(0, 4999);
       if (error) throw error;
-      const { data: fo, error: fe } = await sb.from("caisse_fonds").select("*");
+      let qf = sb.from("caisse_fonds").select("*"); if (multi) qf = qf.eq("entite_id", entiteId);
+      const { data: fo, error: fe } = await qf;
       if (fe) throw fe;
       const fonds = {}, fondsLocked = {}, fondsMeta = {};
       (fo || []).forEach(f => {
@@ -70,6 +76,7 @@ export function createSupabaseStore(sb){
 
     async setFond(dateKey, val, lock, attendu, ecart){
       const row = { op_date: dateKey, montant: val, locked: !!lock };
+      if (multi) row.entite_id = entiteId;
       if (lock){
         row.locked_at = new Date().toISOString();
         if (attendu != null) row.attendu = attendu;
@@ -77,14 +84,14 @@ export function createSupabaseStore(sb){
       }
       const { error } = await sb
         .from("caisse_fonds")
-        .upsert(row, { onConflict: "op_date" });
+        .upsert(row, { onConflict: multi ? "entite_id,op_date" : "op_date" });
       if (error) throw error;
     },
 
     // Stockage des photos (bucket privé "caisse-photos") -> renvoie le chemin
     async uploadPhoto(blob){
       const ext = (blob.type && blob.type.indexOf("png") > -1) ? "png" : "jpg";
-      const path = new Date().toISOString().slice(0, 10) + "/" +
+      const path = (multi ? entiteId + "/" : "") + new Date().toISOString().slice(0, 10) + "/" +
         (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + "_" + Math.random().toString(36).slice(2))) + "." + ext;
       const { error } = await sb.storage.from("caisse-photos")
         .upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: false });
@@ -98,7 +105,8 @@ export function createSupabaseStore(sb){
     },
 
     async listClotures(){
-      const { data, error } = await sb.from("caisse_clotures").select("*");
+      let qc = sb.from("caisse_clotures").select("*"); if (multi) qc = qc.eq("entite_id", entiteId);
+      const { data, error } = await qc;
       if (error) throw error;
       const map = {};
       (data || []).forEach(r => { map[r.op_date] = clFromRow(r); });
@@ -113,6 +121,7 @@ export function createSupabaseStore(sb){
         nb_cheque: c.nbCheque || 0, ecart_cheque: c.ecartCheque || 0,
         operateur: c.operateur || null
       };
+      if (multi) row.entite_id = entiteId;
       const { data, error } = await sb
         .from("caisse_clotures").insert(row).select().single();
       if (error) throw error;
@@ -121,7 +130,7 @@ export function createSupabaseStore(sb){
 
     // Réinitialisation complète : fonction serveur SECURITY DEFINER, réservée à l'admin
     async reset(){
-      const { error } = await sb.rpc("reset_caisse");
+      const { error } = multi ? await sb.rpc("reset_caisse", { p_entite: entiteId }) : await sb.rpc("reset_caisse");
       if (error) throw error;
     }
   };
